@@ -1,2 +1,9 @@
 fastapi
-uvicorn
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+pydantic
+pydantic-settings
+structlog
+black
+ruff

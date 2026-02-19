@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 import structlog
 
-from app.core.config import settings
+from src.config import settings
 
 logger = structlog.get_logger()
 
@@ -22,16 +22,14 @@ Base = declarative_base()
 
 
 async def init_db():
-    """Initialize database tables."""
     async with engine.begin() as conn:
-        # Import all models to ensure they're registered
-        from app.db import models  # noqa: F401
+        from src.contacts import models
+
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables created")
 
 
 async def get_db() -> AsyncSession:
-    """Dependency for getting database sessions."""
     async with AsyncSessionLocal() as session:
         try:
             yield session
