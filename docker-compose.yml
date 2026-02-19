@@ -1,0 +1,23 @@
+services:
+
+  backend:
+    build:
+      context: ./backend
+    container_name: dpb_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend/app
+    container_name: dpb_frontend
+    ports:
+      - "4200:4200"
+    volumes:
+      - ./frontend:/app
+    depends_on:
+      - backend
+    restart: always
