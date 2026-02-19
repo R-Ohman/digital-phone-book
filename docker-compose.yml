@@ -1,5 +1,4 @@
 services:
-
   backend:
     build:
       context: ./backend
@@ -8,11 +7,21 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+    environment:
+      PHONEBOOK_DB: ${PHONEBOOK_DB}
+      PHONEBOOK_DB_USER: ${PHONEBOOK_DB_USER}
+      PHONEBOOK_DB_PASSWORD: ${PHONEBOOK_DB_PASSWORD}
+      LLM_URL: http://llm:11434
+    depends_on:
+      db:
+        condition: service_healthy
+      llm:
+        condition: service_healthy
     restart: always
 
   frontend:
     build:
-      context: ./frontend/app
+      context: ./frontend
     container_name: dpb_frontend
     ports:
       - "4200:4200"
@@ -21,3 +30,45 @@ services:
     depends_on:
       - backend
     restart: always
+
+  db:
+    image: postgres:18-alpine
+    container_name: dpb_db
+    environment:
+      POSTGRES_DB: ${PHONEBOOK_DB}
+      POSTGRES_USER: ${PHONEBOOK_DB_USER}
+      POSTGRES_PASSWORD: ${PHONEBOOK_DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  llm:
+    image: ollama/ollama:latest
+    container_name: dpb_llm
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: always
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "ollama serve &
+      sleep 5 &&
+      ollama pull qwen2.5:3b &&
+      wait"
+    healthcheck:
+      test: "ollama --version && ollama ps || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 50
+
+volumes:
+  postgres_data:
+  ollama_data:
