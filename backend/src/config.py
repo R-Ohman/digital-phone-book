@@ -13,6 +13,28 @@ class Settings(BaseSettings):
     phonebook_db_port: int = 5432
 
     llm_url: str = "http://llm:11434"
+    llm_provider: str = "ollama"
+    llm_model: str = "qwen2.5:3b"
+
+    @computed_field
+    @property
+    def parse_model(self) -> str:
+        return self.llm_model
+
+    @computed_field
+    @property
+    def response_model(self) -> str:
+        return self.llm_model
+
+    @computed_field
+    @property
+    def parse_llm_url(self) -> str:
+        return self.llm_url
+
+    @computed_field
+    @property
+    def response_llm_url(self) -> str:
+        return self.llm_url
 
     @computed_field
     @property

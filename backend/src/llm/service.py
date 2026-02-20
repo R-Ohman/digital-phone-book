@@ -1,16 +1,13 @@
 from src.llm.schemas import UserPrompt
 from src.contacts.service import ContactService
-from openai import OpenAI
-from src.config import settings
-
+from src.llm.agents.parse import ParseAgent
+from src.llm.agents.response import ResponseAgent
 
 class LLMService:
     def __init__(self, contact_service: ContactService):
+        self._parse_agent = ParseAgent()
+        self._response_agent = ResponseAgent()
         self._contact_service = contact_service
-        self._llm_client = OpenAI(
-            base_url=settings.llm_url,
-            api_key="api_key",
-        )
 
     def process_user_prompt(self, user_prompt: UserPrompt):
         pass
