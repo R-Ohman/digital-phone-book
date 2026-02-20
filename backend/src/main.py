@@ -2,15 +2,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.database import init_db
+from src.database import run_migrations
 from src.contacts.router import router as contacts_router
 from src.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize database on startup."""
-    await init_db()
+    run_migrations()
     yield
 
 

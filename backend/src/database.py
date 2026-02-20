@@ -1,10 +1,10 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-import structlog
+from alembic.config import Config
+from alembic import command
 
 from src.config import settings
 
-logger = structlog.get_logger()
 
 engine = create_async_engine(
     settings.database_url,
@@ -21,12 +21,9 @@ AsyncSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def init_db():
-    async with engine.begin() as conn:
-        from src.contacts import models
-
-        await conn.run_sync(Base.metadata.create_all)
-    logger.info("Database tables created")
+def run_migrations():
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
 
 
 async def get_db() -> AsyncSession:
