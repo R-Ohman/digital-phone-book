@@ -38,8 +38,6 @@ services:
       POSTGRES_DB: ${PHONEBOOK_DB}
       POSTGRES_USER: ${PHONEBOOK_DB_USER}
       POSTGRES_PASSWORD: ${PHONEBOOK_DB_PASSWORD}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: always
@@ -50,24 +48,16 @@ services:
       retries: 5
 
   llm:
-    image: ollama/ollama:latest
+    build: llm
     container_name: dpb_llm
-    ports:
-      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: always
-    entrypoint: ["/bin/sh", "-c"]
-    command: >
-      "ollama serve &
-      sleep 5 &&
-      ollama pull qwen2.5:3b &&
-      wait"
     healthcheck:
-      test: "ollama --version && ollama ps || exit 1"
+      test: ["CMD-SHELL", "ollama --version || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 50
+      retries: 20
 
 volumes:
   postgres_data:

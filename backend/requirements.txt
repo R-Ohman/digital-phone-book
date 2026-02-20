@@ -7,3 +7,4 @@ pydantic-settings
 structlog
 black
 ruff
+OpenAI
