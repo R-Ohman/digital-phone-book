@@ -57,6 +57,7 @@ export class ChatPanelComponent {
     { role: 'assistant', text: 'Hi there! How can I assist you?' },
   ]);
   sending = signal<boolean>(false);
+  streamingStarted = signal<boolean>(false);
   inputDisabled = computed(() => this.sending());
   surfaces = signal<ReadonlyMap<string, any>>(new Map());
 
@@ -134,32 +135,42 @@ export class ChatPanelComponent {
     if (!prompt) return;
 
     this.sending.set(true);
+    this.streamingStarted.set(false);
     this.messages.update((arr) => [...arr, { role: 'user', text: prompt }]);
+    this.messages.update((arr) => [...arr, { role: 'assistant', text: '' }]);
+    const assistantIdx = this.messages().length - 1;
 
     this.promptInput.reset();
     this.#llmApi
-      .sendPrompt({ prompt })
+      .sendPromptStream({ prompt })
       .pipe(finalize(() => this.sending.set(false)))
       .subscribe({
-        next: (res) => {
-          let surfaceIds: string[] | undefined;
-          if (res.a2UiMessages?.length) {
+        next: (chunk) => {
+          if (chunk.type === 'token') {
+            if (!this.streamingStarted()) this.streamingStarted.set(true);
+            this.messages.update((arr) => {
+              const copy = [...arr];
+              copy[assistantIdx] = {
+                ...copy[assistantIdx],
+                text: copy[assistantIdx].text + chunk.text,
+              };
+              return copy;
+            });
+          } else if (chunk.type === 'a2ui') {
             const ts = Date.now();
-            // Collect all distinct backend surface IDs
             const backendIds = [
               ...new Set(
-                (res.a2UiMessages as any[]).flatMap((msg) =>
+                (chunk.messages as any[]).flatMap((msg) =>
                   ['surfaceUpdate', 'dataModelUpdate', 'beginRendering', 'deleteSurface']
                     .map((k) => msg[k]?.surfaceId)
                     .filter(Boolean),
                 ),
               ),
             ] as string[];
-            // Map each backend surface ID to a unique runtime surface ID
             const idMap = new Map<string, string>(
               backendIds.map((id, i) => [id, `${id}-${ts}-${i}`]),
             );
-            const remapped = (res.a2UiMessages as any[]).map((msg) => {
+            const remapped = (chunk.messages as any[]).map((msg) => {
               const clone = JSON.parse(JSON.stringify(msg));
               for (const key of [
                 'surfaceUpdate',
@@ -175,8 +186,7 @@ export class ChatPanelComponent {
             });
             this.processor.processMessages(remapped);
             this.surfaces.set(new Map(this.processor.getSurfaces()));
-            surfaceIds = [...idMap.values()];
-            // Map contact id -> runtime surfaceId so the delete handler can update the surface.
+            const surfaceIds = [...idMap.values()];
             for (const msg of remapped) {
               if (msg.surfaceUpdate) {
                 const deleteBtn = msg.surfaceUpdate.components?.find(
@@ -188,12 +198,20 @@ export class ChatPanelComponent {
                 if (contactId) this.#contactSurfaceMap.set(contactId, msg.surfaceUpdate.surfaceId);
               }
             }
+            this.messages.update((arr) => {
+              const copy = [...arr];
+              copy[assistantIdx] = { ...copy[assistantIdx], surfaceIds };
+              return copy;
+            });
+          } else if (chunk.type === 'done') {
+            this.refreshRequested.emit();
+          } else if (chunk.type === 'error') {
+            this.#messageService.add({
+              severity: 'error',
+              summary: 'Chat Error',
+              detail: chunk.detail,
+            });
           }
-          this.messages.update((arr) => [
-            ...arr,
-            { role: 'assistant', text: res.message, surfaceIds },
-          ]);
-          this.refreshRequested.emit();
         },
         error: (err: unknown) => {
           const detail = err instanceof Error ? err.message : 'Failed to send message';

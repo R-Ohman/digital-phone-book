@@ -1,5 +1,5 @@
 import json
-from typing import Optional, List, Tuple
+from typing import AsyncGenerator, Dict, Any, Optional, List, Tuple
 
 from langchain_classic.agents import (
     AgentExecutor,
@@ -155,7 +155,7 @@ _BASE_SYSTEM_PROMPT = """You are a phone book assistant with access to tools for
 Think step by step:
 - Use tools to look up information before making conditional decisions.
 - For requests like "if John exists update him, otherwise create him", first call get_contact to check, then decide.
-- For queries like "how many contacts have a 123 prefix", call get_all_contacts then reason over the results.
+- For queries like "how many contacts have a prefix [prefix]", call get_all_contacts then reason over the results.
 - For swap requests like "swap phone numbers of A and B", first call get_contact for both A and B to retrieve their current numbers, then call update_contact on A with B's number, then call update_contact on B with A's original number.
 - Execute every requested operation before writing your final answer.
 - Be concise and conversational in your final response.
@@ -229,6 +229,69 @@ class ToolCallAgent:
                     pass
 
         return raw_output.strip(), a2ui_messages if a2ui_messages else None
+
+    async def execute_stream(
+        self, user_prompt: str
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream the agent response token-by-token, then emit A2UI messages."""
+        seen_contact_ids: set = set()
+        a2ui_messages: List = []
+        tool_calling_runs: set = set()
+
+        async for event in self._executor.astream_events(
+            {"input": user_prompt}, version="v2"
+        ):
+            event_name = event.get("event")
+            run_id = event.get("run_id")
+
+            if event_name == "on_chat_model_stream":
+                chunk = event.get("data", {}).get("chunk")
+                if chunk is not None:
+                    if getattr(chunk, "tool_call_chunks", None):
+                        tool_calling_runs.add(run_id)
+                    content = getattr(chunk, "content", "")
+                    if (
+                        isinstance(content, str)
+                        and content
+                        and run_id not in tool_calling_runs
+                    ):
+                        yield {"type": "token", "text": content}
+
+            elif event_name == "on_tool_end":
+                tool_name = event.get("name", "")
+                output = event.get("data", {}).get("output", "")
+                if isinstance(output, str):
+                    if tool_name == "get_contact":
+                        try:
+                            data = json.loads(output)
+                            if data.get("found") and data["id"] not in seen_contact_ids:
+                                seen_contact_ids.add(data["id"])
+                                a2ui_messages.extend(
+                                    _build_contact_card_a2ui(
+                                        data["name"], data["phone_number"], data["id"]
+                                    )
+                                )
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+                    elif tool_name in ("add_contact", "update_contact"):
+                        try:
+                            data = json.loads(output)
+                            if (
+                                data.get("success")
+                                and data["id"] not in seen_contact_ids
+                            ):
+                                seen_contact_ids.add(data["id"])
+                                a2ui_messages.extend(
+                                    _build_contact_card_a2ui(
+                                        data["name"], data["phone_number"], data["id"]
+                                    )
+                                )
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+
+        if a2ui_messages:
+            yield {"type": "a2ui", "messages": a2ui_messages}
+        yield {"type": "done"}
 
     def _make_service(self, session: AsyncSession) -> ContactService:
         return ContactService(ContactRepository(session))

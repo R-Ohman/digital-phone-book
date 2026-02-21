@@ -26,7 +26,7 @@
         }
       </div>
     }
-    @if (sending()) {
+    @if (sending() && !streamingStarted()) {
       <div class="chat-panel__message chat-panel__message--assistant">
         <div class="chat-panel__bubble" data-role="assistant">
           <p-progressSpinner
