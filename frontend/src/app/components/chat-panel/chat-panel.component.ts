@@ -4,15 +4,18 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  computed,
+  effect,
   inject,
   output,
   signal,
+  ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ContactsApi } from '@api/contacts.api';
 import { LlmApi } from '@api/llm.api';
+import { ChatLoadingComponent } from '@components/chat-panel/chat-loading/chat-loading.component';
+import { ChatHistoryMessage } from '@models/prompt';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
@@ -37,11 +40,13 @@ interface ChatMessage {
     ProgressSpinnerModule,
     FormsModule,
     Surface,
+    ChatLoadingComponent,
   ],
   providers: [ConfirmationService],
   templateUrl: './chat-panel.component.html',
   styleUrl: './chat-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  encapsulation: ViewEncapsulation.None,
 })
 export class ChatPanelComponent {
   readonly #llmApi = inject(LlmApi);
@@ -58,13 +63,20 @@ export class ChatPanelComponent {
   ]);
   sending = signal<boolean>(false);
   streamingStarted = signal<boolean>(false);
-  inputDisabled = computed(() => this.sending());
   surfaces = signal<ReadonlyMap<string, any>>(new Map());
 
   promptInput = this.#formBuilder.control<string>('', [Validators.maxLength(1024)]);
   readonly #contactSurfaceMap = new Map<string, string>();
 
   constructor() {
+    effect(() => {
+      if (this.sending()) {
+        this.promptInput.disable();
+      } else {
+        this.promptInput.enable();
+      }
+    });
+
     this.processor.events.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe((event) => {
       const userAction = (event.message as any)?.userAction;
       if (userAction?.name === 'call') {
@@ -74,6 +86,18 @@ export class ChatPanelComponent {
         }
         event.completion.next([]);
         event.completion.complete();
+      } else if (userAction?.name === 'close') {
+        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
+        if (surfaceId) {
+          this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
+          this.surfaces.set(new Map(this.processor.getSurfaces()));
+          this.messages.update((arr) =>
+            arr.map((msg) => ({
+              ...msg,
+              surfaceIds: msg.surfaceIds?.filter((id) => id !== surfaceId),
+            })),
+          );
+        }
       } else if (userAction?.name === 'delete') {
         const id = (userAction.context?.['id'] as string | undefined) ?? '';
         const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
@@ -134,6 +158,10 @@ export class ChatPanelComponent {
     const prompt = this.promptInput.value.trim();
     if (!prompt) return;
 
+    const history: ChatHistoryMessage[] = this.messages()
+      .filter((msg) => msg.text)
+      .map((msg) => ({ role: msg.role, content: msg.text }));
+
     this.sending.set(true);
     this.streamingStarted.set(false);
     this.messages.update((arr) => [...arr, { role: 'user', text: prompt }]);
@@ -142,7 +170,7 @@ export class ChatPanelComponent {
 
     this.promptInput.reset();
     this.#llmApi
-      .sendPromptStream({ prompt })
+      .sendPromptStream({ prompt, history })
       .pipe(finalize(() => this.sending.set(false)))
       .subscribe({
         next: (chunk) => {
@@ -157,7 +185,6 @@ export class ChatPanelComponent {
               return copy;
             });
           } else if (chunk.type === 'a2ui') {
-            const ts = Date.now();
             const backendIds = [
               ...new Set(
                 (chunk.messages as any[]).flatMap((msg) =>
@@ -167,9 +194,6 @@ export class ChatPanelComponent {
                 ),
               ),
             ] as string[];
-            const idMap = new Map<string, string>(
-              backendIds.map((id, i) => [id, `${id}-${ts}-${i}`]),
-            );
             const remapped = (chunk.messages as any[]).map((msg) => {
               const clone = JSON.parse(JSON.stringify(msg));
               for (const key of [
@@ -179,14 +203,14 @@ export class ChatPanelComponent {
                 'deleteSurface',
               ]) {
                 if (clone[key]?.surfaceId) {
-                  clone[key].surfaceId = idMap.get(clone[key].surfaceId) ?? clone[key].surfaceId;
+                  clone[key].surfaceId = clone[key].surfaceId;
                 }
               }
               return clone;
             });
             this.processor.processMessages(remapped);
             this.surfaces.set(new Map(this.processor.getSurfaces()));
-            const surfaceIds = [...idMap.values()];
+            const surfaceIds = [...backendIds];
             for (const msg of remapped) {
               if (msg.surfaceUpdate) {
                 const deleteBtn = msg.surfaceUpdate.components?.find(

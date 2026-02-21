@@ -1,5 +1,11 @@
+export interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 export interface Prompt {
   prompt: string;
+  history?: ChatHistoryMessage[];
 }
 
 export interface PromptResponse {

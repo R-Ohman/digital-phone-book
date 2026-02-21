@@ -70,15 +70,14 @@
     background: $color-surface-100;
   }
 
-  &__spinner {
-    width: 1rem;
-    height: 1rem;
-  }
-
   &__surfaces {
     display: flex;
     gap: $space-3;
     flex-wrap: wrap;
+  }
+
+  button:has(a2ui-icon) {
+    padding: 0 !important;
   }
 }
 

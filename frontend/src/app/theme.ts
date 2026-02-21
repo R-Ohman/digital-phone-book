@@ -112,7 +112,7 @@ const p = {
   'typography-fs-n': true,
   'typography-w-400': true,
   'layout-m-0': true,
-  'typography-sz-bm': true,
+  'typography-sz-tm': true,
   'layout-as-n': true,
   'color-c-n10': true,
 };
@@ -216,10 +216,10 @@ export const theme: Theme = {
   components: {
     AudioPlayer: {},
     Button: {
-      'layout-pt-2': true,
-      'layout-pb-2': true,
-      'layout-pl-5': true,
-      'layout-pr-5': true,
+      'layout-pt-5': true,
+      'layout-pb-5': true,
+      'layout-pl-7': true,
+      'layout-pr-7': true,
       'border-br-16': true,
       'border-bw-0': true,
       'border-bs-s': true,

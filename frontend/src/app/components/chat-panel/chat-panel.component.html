@@ -2,7 +2,7 @@
 <div class="chat-panel">
   <div class="chat-panel__heading" id="chat-heading">
     <i class="pi pi-comments"></i>
-    <h2>Assistant</h2>
+    <h2>AI Assistant</h2>
   </div>
 
   <div aria-labelledby="chat-heading" aria-live="polite" class="chat-panel__messages" role="log">
@@ -27,15 +27,7 @@
       </div>
     }
     @if (sending() && !streamingStarted()) {
-      <div class="chat-panel__message chat-panel__message--assistant">
-        <div class="chat-panel__bubble" data-role="assistant">
-          <p-progressSpinner
-            class="chat-panel__spinner"
-            ariaLabel="Waiting for response"
-          ></p-progressSpinner>
-          Thinking...
-        </div>
-      </div>
+      <app-chat-loading />
     }
   </div>
 
@@ -47,7 +39,6 @@
   >
     <div class="chat-panel__field">
       <input
-        [disabled]="inputDisabled()"
         [formControl]="promptInput"
         aria-label="Message"
         class="chat-panel__input"
@@ -56,13 +47,6 @@
         type="text"
       />
     </div>
-    <button
-      [disabled]="inputDisabled()"
-      [rounded]="true"
-      icon="pi pi-send"
-      label="Send"
-      pButton
-      type="submit"
-    ></button>
+    <button [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
   </form>
 </div>

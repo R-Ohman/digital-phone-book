@@ -5,6 +5,7 @@ from langchain_classic.agents import (
     AgentExecutor,
     create_tool_calling_agent,
 )
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import StructuredTool
 from langchain_ollama import ChatOllama
@@ -38,7 +39,7 @@ def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
                             "Column": {
                                 "children": {
                                     "explicitList": [
-                                        "name-text",
+                                        "header-row",
                                         "divider",
                                         "phone-row",
                                         "actions",
@@ -48,11 +49,44 @@ def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
                         },
                     },
                     {
+                        "id": "header-row",
+                        "component": {
+                            "Row": {
+                                "distribution": "spaceBetween",
+                                "alignment": "center",
+                                "children": {
+                                    "explicitList": ["name-text", "close-btn"]
+                                },
+                            }
+                        },
+                    },
+                    {
                         "id": "name-text",
                         "component": {
                             "Text": {
                                 "text": {"literalString": name},
                                 "usageHint": "h2",
+                            }
+                        },
+                    },
+                    {
+                        "id": "close-btn-icon",
+                        "component": {"Icon": {"name": {"literalString": "close"}}},
+                    },
+                    {
+                        "id": "close-btn",
+                        "component": {
+                            "Button": {
+                                "child": "close-btn-icon",
+                                "action": {
+                                    "name": "close",
+                                    "context": [
+                                        {
+                                            "key": "surfaceId",
+                                            "value": {"literalString": surface_id},
+                                        }
+                                    ],
+                                },
                             }
                         },
                     },
@@ -158,6 +192,8 @@ Think step by step:
 - For queries like "how many contacts have a prefix [prefix]", call get_all_contacts then reason over the results.
 - For swap requests like "swap phone numbers of A and B", first call get_contact for both A and B to retrieve their current numbers, then call update_contact on A with B's number, then call update_contact on B with A's original number.
 - Execute every requested operation before writing your final answer.
+- IMPORTANT: To add a contact you need BOTH a name AND a phone number. If the user asks to create or add a contact but does not provide a phone number, do NOT call add_contact. Instead, ask the user to provide the phone number first, then add the contact once you have it.
+- If you require any other additional data to perform an action, ask the user to provide it before proceeding.
 - Be concise and conversational in your final response.
 """
 
@@ -166,6 +202,7 @@ SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
 PROMPT = ChatPromptTemplate.from_messages(
     [
         ("system", SYSTEM_PROMPT),
+        MessagesPlaceholder("chat_history"),
         ("human", "{input}"),
         MessagesPlaceholder("agent_scratchpad"),
     ]
@@ -195,8 +232,24 @@ class ToolCallAgent:
             return_intermediate_steps=True,
         )
 
-    async def execute(self, user_prompt: str) -> Tuple[str, Optional[List]]:
-        result = await self._executor.ainvoke({"input": user_prompt})
+    @staticmethod
+    def _build_chat_history(history: Optional[List[Dict[str, str]]]) -> List:
+        messages = []
+        for msg in history or []:
+            role = msg.get("role", "")
+            content = msg.get("content", "")
+            if role == "user":
+                messages.append(HumanMessage(content=content))
+            elif role == "assistant":
+                messages.append(AIMessage(content=content))
+        return messages
+
+    async def execute(
+        self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
+    ) -> Tuple[str, Optional[List]]:
+        result = await self._executor.ainvoke(
+            {"input": user_prompt, "chat_history": self._build_chat_history(history)}
+        )
         raw_output: str = result.get("output", "") or ""
 
         a2ui_messages: List = []
@@ -231,7 +284,7 @@ class ToolCallAgent:
         return raw_output.strip(), a2ui_messages if a2ui_messages else None
 
     async def execute_stream(
-        self, user_prompt: str
+        self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream the agent response token-by-token, then emit A2UI messages."""
         seen_contact_ids: set = set()
@@ -239,7 +292,8 @@ class ToolCallAgent:
         tool_calling_runs: set = set()
 
         async for event in self._executor.astream_events(
-            {"input": user_prompt}, version="v2"
+            {"input": user_prompt, "chat_history": self._build_chat_history(history)},
+            version="v2",
         ):
             event_name = event.get("event")
             run_id = event.get("run_id")
