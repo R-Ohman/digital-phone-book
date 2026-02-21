@@ -4,4 +4,5 @@ export interface Prompt {
 
 export interface PromptResponse {
   message: string;
+  a2UiMessages?: any[];
 }

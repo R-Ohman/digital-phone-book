@@ -1,5 +1,5 @@
 import json
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
 from langchain_classic.agents import (
     AgentExecutor,
@@ -23,7 +23,110 @@ from .schemas import (
 )
 
 
-SYSTEM_PROMPT = """You are a phone book assistant with access to tools for managing contacts.
+_CONTACT_CARD_SURFACE_ID = "contact-card"
+
+
+def _build_contact_card_a2ui(name: str, phone: str) -> List:
+    """Return the three A2UI v0.8 messages that render a contact card surface."""
+    surface_id = _CONTACT_CARD_SURFACE_ID
+    return [
+        {
+            "surfaceUpdate": {
+                "surfaceId": surface_id,
+                "components": [
+                    {"id": "root", "component": {"Card": {"child": "main-column"}}},
+                    {
+                        "id": "main-column",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": [
+                                        "name-text",
+                                        "divider",
+                                        "phone-row",
+                                        "actions",
+                                    ]
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "id": "name-text",
+                        "component": {
+                            "Text": {
+                                "text": {"literalString": name},
+                                "usageHint": "h2",
+                            }
+                        },
+                    },
+                    {"id": "divider", "component": {"Divider": {}}},
+                    {
+                        "id": "phone-row",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": ["phone-icon", "phone-text"]
+                                }
+                            }
+                        },
+                    },
+                    {
+                        "id": "phone-icon",
+                        "component": {"Icon": {"name": {"literalString": "phone"}}},
+                    },
+                    {
+                        "id": "phone-text",
+                        "component": {"Text": {"text": {"literalString": phone}}},
+                    },
+                    {
+                        "id": "actions",
+                        "component": {
+                            "List": {"children": {"explicitList": ["call-btn"]}}
+                        },
+                    },
+                    {
+                        "id": "call-btn-label",
+                        "component": {"Text": {"text": {"literalString": "Call"}}},
+                    },
+                    {
+                        "id": "call-btn",
+                        "component": {
+                            "Button": {
+                                "child": "call-btn-label",
+                                "action": {
+                                    "name": "call",
+                                    "context": [
+                                        {
+                                            "key": "phone",
+                                            "value": {"literalString": phone},
+                                        }
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                ],
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": surface_id,
+                "contents": [
+                    {"key": "name", "valueString": name},
+                    {"key": "phone", "valueString": phone},
+                ],
+            }
+        },
+        {
+            "beginRendering": {
+                "surfaceId": surface_id,
+                "root": "root",
+            }
+        },
+    ]
+
+
+_BASE_SYSTEM_PROMPT = """You are a phone book assistant with access to tools for managing contacts.
 
 Think step by step:
 - Use tools to look up information before making conditional decisions.
@@ -33,6 +136,8 @@ Think step by step:
 - Execute every requested operation before writing your final answer.
 - Be concise and conversational in your final response.
 """
+
+SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
 
 PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -44,7 +149,11 @@ PROMPT = ChatPromptTemplate.from_messages(
 
 
 class ToolCallAgent:
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession], model: Optional[str] = None):
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+        model: Optional[str] = None,
+    ):
         self._session_factory = session_factory
         model = model or settings.llm_model
         self._llm = ChatOllama(
@@ -59,11 +168,27 @@ class ToolCallAgent:
             agent=agent,
             tools=self._tools,
             handle_parsing_errors=True,
+            return_intermediate_steps=True,
         )
 
-    async def execute(self, user_prompt: str) -> str:
+    async def execute(self, user_prompt: str) -> Tuple[str, Optional[List]]:
         result = await self._executor.ainvoke({"input": user_prompt})
-        return result["output"]
+        raw_output: str = result.get("output", "") or ""
+
+        a2ui_messages: Optional[List] = None
+        for action, observation in result.get("intermediate_steps", []):
+            if getattr(action, "tool", None) == "get_contact":
+                try:
+                    data = json.loads(observation)
+                    if data.get("found"):
+                        a2ui_messages = _build_contact_card_a2ui(
+                            data["name"], data["phone_number"]
+                        )
+                except (json.JSONDecodeError, KeyError):
+                    pass
+                break
+
+        return raw_output.strip(), a2ui_messages
 
     def _make_service(self, session: AsyncSession) -> ContactService:
         return ContactService(ContactRepository(session))

@@ -7,28 +7,56 @@
   <div aria-labelledby="chat-heading" aria-live="polite" class="chat-panel__messages" role="log">
     @for (message of messages(); track $index) {
       <div [class]="['chat-panel__message', 'chat-panel__message--' + message.role]">
-        <div class="chat-panel__bubble" [attr.aria-label]="message.role === 'user' ? 'You' : 'Assistant'">
+        <div
+          class="chat-panel__bubble"
+          [attr.aria-label]="message.role === 'user' ? 'You' : 'Assistant'"
+        >
           {{ message.text }}
         </div>
+      </div>
+    }
+    @for (entry of surfaces(); track entry[0]) {
+      <div class="chat-panel__message chat-panel__message--assistant">
+        <a2ui-surface [surfaceId]="entry[0]" [surface]="entry[1]" />
       </div>
     }
     @if (sending()) {
       <div class="chat-panel__message chat-panel__message--assistant">
         <div class="chat-panel__bubble" data-role="assistant">
-          <p-progressSpinner class="chat-panel__spinner" ariaLabel="Waiting for response"></p-progressSpinner>
+          <p-progressSpinner
+            class="chat-panel__spinner"
+            ariaLabel="Waiting for response"
+          ></p-progressSpinner>
           Thinking...
         </div>
       </div>
     }
   </div>
 
-  <form (ngSubmit)="send()" [class.chat-panel__composer--sending]="sending()" class="chat-panel__composer" novalidate>
+  <form
+    (ngSubmit)="send()"
+    [class.chat-panel__composer--sending]="sending()"
+    class="chat-panel__composer"
+    novalidate
+  >
     <div class="chat-panel__field">
-      <input [disabled]="inputDisabled()" [formControl]="promptInput" aria-label="Message"
-             class="chat-panel__input"
-             pInputText
-             placeholder="Type a command, e.g. Add John with number 123..." type="text"/>
+      <input
+        [disabled]="inputDisabled()"
+        [formControl]="promptInput"
+        aria-label="Message"
+        class="chat-panel__input"
+        pInputText
+        placeholder="Type a command, e.g. Add John with number 123..."
+        type="text"
+      />
     </div>
-    <button [disabled]="inputDisabled()" [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
+    <button
+      [disabled]="inputDisabled()"
+      [rounded]="true"
+      icon="pi pi-send"
+      label="Send"
+      pButton
+      type="submit"
+    ></button>
   </form>
 </div>
