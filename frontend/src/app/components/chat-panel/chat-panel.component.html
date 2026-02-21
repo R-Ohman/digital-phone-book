@@ -1,3 +1,4 @@
+<p-confirmDialog />
 <div class="chat-panel">
   <div class="chat-panel__heading" id="chat-heading">
     <i class="pi pi-comments"></i>
@@ -14,11 +15,11 @@
           {{ message.text }}
         </div>
       </div>
-    }
-    @for (entry of surfaces(); track entry[0]) {
-      <div class="chat-panel__message chat-panel__message--assistant">
-        <a2ui-surface [surfaceId]="entry[0]" [surface]="entry[1]" />
-      </div>
+      @if (message.surfaceId && surfaces().get(message.surfaceId); as surface) {
+        <div class="chat-panel__message chat-panel__message--assistant">
+          <a2ui-surface [surfaceId]="message.surfaceId" [surface]="surface" />
+        </div>
+      }
     }
     @if (sending()) {
       <div class="chat-panel__message chat-panel__message--assistant">

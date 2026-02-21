@@ -26,7 +26,7 @@ from .schemas import (
 _CONTACT_CARD_SURFACE_ID = "contact-card"
 
 
-def _build_contact_card_a2ui(name: str, phone: str) -> List:
+def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
     """Return the three A2UI v0.8 messages that render a contact card surface."""
     surface_id = _CONTACT_CARD_SURFACE_ID
     return [
@@ -81,7 +81,9 @@ def _build_contact_card_a2ui(name: str, phone: str) -> List:
                     {
                         "id": "actions",
                         "component": {
-                            "List": {"children": {"explicitList": ["call-btn"]}}
+                            "List": {
+                                "children": {"explicitList": ["call-btn", "delete-btn"]}
+                            }
                         },
                     },
                     {
@@ -100,6 +102,31 @@ def _build_contact_card_a2ui(name: str, phone: str) -> List:
                                             "key": "phone",
                                             "value": {"literalString": phone},
                                         }
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                    {
+                        "id": "delete-btn-label",
+                        "component": {"Text": {"text": {"literalString": "Delete"}}},
+                    },
+                    {
+                        "id": "delete-btn",
+                        "component": {
+                            "Button": {
+                                "child": "delete-btn-label",
+                                "action": {
+                                    "name": "delete",
+                                    "context": [
+                                        {
+                                            "key": "id",
+                                            "value": {"literalString": contact_id},
+                                        },
+                                        {
+                                            "key": "name",
+                                            "value": {"literalString": name},
+                                        },
                                     ],
                                 },
                             }
@@ -182,7 +209,7 @@ class ToolCallAgent:
                     data = json.loads(observation)
                     if data.get("found"):
                         a2ui_messages = _build_contact_card_a2ui(
-                            data["name"], data["phone_number"]
+                            data["name"], data["phone_number"], data["id"]
                         )
                 except (json.JSONDecodeError, KeyError):
                     pass
@@ -202,6 +229,7 @@ class ToolCallAgent:
                 return json.dumps(
                     {
                         "found": True,
+                        "id": str(contact.id),
                         "name": contact.name,
                         "phone_number": contact.phone_number,
                     }

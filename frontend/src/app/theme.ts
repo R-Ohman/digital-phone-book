@@ -198,6 +198,14 @@ export const theme: Theme = {
       transition: 'opacity 0.15s ease, transform 0.1s ease',
       background: '#999',
     },
+    List: {
+      display: 'flex',
+      'flex-direction': 'row',
+      'flex-wrap': 'wrap',
+      'justify-content': 'center',
+      'align-items': 'center',
+      gap: '8px',
+    },
     Image: {
       'max-width': '120px',
       'max-height': '120px',
@@ -309,6 +317,7 @@ export const theme: Theme = {
       'layout-sp-c': true,
       'layout-g-4': true,
       'layout-p-2': true,
+      'layout-fw-w': true,
     },
     Modal: {
       backdrop: { 'color-bbgc-p60_20': true },

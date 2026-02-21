@@ -1,15 +1,16 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { TableModule } from 'primeng/table';
-import { ButtonModule } from 'primeng/button';
-import { DialogModule } from 'primeng/dialog';
-import { ToolbarModule } from 'primeng/toolbar';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ConfirmationService, MessageService } from 'primeng/api';
-import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ContactsApi } from '@api/contacts.api';
-import { finalize } from 'rxjs/operators';
 import { Contact } from '@models/contact';
+import { ConfirmationService, MessageService } from 'primeng/api';
+import { ButtonModule } from 'primeng/button';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { ConfirmPopup } from 'primeng/confirmpopup';
+import { DialogModule } from 'primeng/dialog';
+import { ProgressSpinnerModule } from 'primeng/progressspinner';
+import { TableModule } from 'primeng/table';
+import { ToolbarModule } from 'primeng/toolbar';
+import { finalize } from 'rxjs/operators';
 import { ContactFormComponent } from '../contact-form/contact-form.component';
 
 @Component({
@@ -23,6 +24,7 @@ import { ContactFormComponent } from '../contact-form/contact-form.component';
     ConfirmDialogModule,
     ProgressSpinnerModule,
     ContactFormComponent,
+    ConfirmPopup,
   ],
   templateUrl: './contact-list.component.html',
   styleUrl: './contact-list.component.scss',
