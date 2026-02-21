@@ -8,8 +8,10 @@ from langchain_classic.agents import (
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.tools import StructuredTool
 from langchain_ollama import ChatOllama
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.contacts.service import ContactService
+from src.contacts.repository import ContactRepository
 from src.contacts.schemas import ContactCreate, ContactUpdate
 from src.config import settings
 from .schemas import (
@@ -27,6 +29,7 @@ Think step by step:
 - Use tools to look up information before making conditional decisions.
 - For requests like "if John exists update him, otherwise create him", first call get_contact to check, then decide.
 - For queries like "how many contacts have a 123 prefix", call get_all_contacts then reason over the results.
+- For swap requests like "swap phone numbers of A and B", first call get_contact for both A and B to retrieve their current numbers, then call update_contact on A with B's number, then call update_contact on B with A's original number.
 - Execute every requested operation before writing your final answer.
 - Be concise and conversational in your final response.
 """
@@ -41,8 +44,8 @@ PROMPT = ChatPromptTemplate.from_messages(
 
 
 class ToolCallAgent:
-    def __init__(self, contact_service: ContactService, model: Optional[str] = None):
-        self._contact_service = contact_service
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession], model: Optional[str] = None):
+        self._session_factory = session_factory
         model = model or settings.llm_model
         self._llm = ChatOllama(
             model=model,
@@ -52,17 +55,24 @@ class ToolCallAgent:
         )
         self._tools = self._build_tools()
         agent = create_tool_calling_agent(self._llm, self._tools, PROMPT)
-        self._executor = AgentExecutor(agent=agent, tools=self._tools)
+        self._executor = AgentExecutor(
+            agent=agent,
+            tools=self._tools,
+            handle_parsing_errors=True,
+        )
 
     async def execute(self, user_prompt: str) -> str:
         result = await self._executor.ainvoke({"input": user_prompt})
         return result["output"]
 
-    def _build_tools(self) -> List[StructuredTool]:
-        svc = self._contact_service
+    def _make_service(self, session: AsyncSession) -> ContactService:
+        return ContactService(ContactRepository(session))
 
+    def _build_tools(self) -> List[StructuredTool]:
         async def get_contact(name: str) -> str:
-            contact = await svc.get_by_name(name)
+            async with self._session_factory() as session:
+                svc = self._make_service(session)
+                contact = await svc.get_by_name(name)
             if contact:
                 return json.dumps(
                     {
@@ -74,16 +84,20 @@ class ToolCallAgent:
             return json.dumps({"found": False, "name": name})
 
         async def get_all_contacts() -> str:
-            contacts = await svc.get_all()
+            async with self._session_factory() as session:
+                svc = self._make_service(session)
+                contacts = await svc.get_all()
             return json.dumps(
                 [{"name": c.name, "phone_number": c.phone_number} for c in contacts]
             )
 
         async def add_contact(name: str, phone_number: str) -> str:
             try:
-                contact = await svc.create(
-                    ContactCreate(name=name, phone_number=phone_number)
-                )
+                async with self._session_factory() as session:
+                    svc = self._make_service(session)
+                    contact = await svc.create(
+                        ContactCreate(name=name, phone_number=phone_number)
+                    )
                 return json.dumps(
                     {
                         "success": True,
@@ -95,7 +109,9 @@ class ToolCallAgent:
                 return json.dumps({"success": False, "error": str(exc)})
 
         async def delete_contact(name: str) -> str:
-            deleted = await svc.delete_by_name(name)
+            async with self._session_factory() as session:
+                svc = self._make_service(session)
+                deleted = await svc.delete_by_name(name)
             return json.dumps({"success": deleted, "name": name})
 
         async def update_contact(
@@ -103,9 +119,11 @@ class ToolCallAgent:
             new_name: Optional[str] = None,
             new_phone_number: Optional[str] = None,
         ) -> str:
-            contact = await svc.update_by_name(
-                name, ContactUpdate(name=new_name, phone_number=new_phone_number)
-            )
+            async with self._session_factory() as session:
+                svc = self._make_service(session)
+                contact = await svc.update_by_name(
+                    name, ContactUpdate(name=new_name, phone_number=new_phone_number)
+                )
             if not contact:
                 return json.dumps(
                     {"success": False, "error": f"Contact '{name}' not found"}

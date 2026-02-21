@@ -1,6 +1,8 @@
-from pydantic import BaseModel, Field
+from pydantic import Field
+
+from src.schemas import CamelCaseModel
 
 
-class UserPrompt(BaseModel):
+class UserPrompt(CamelCaseModel):
 
     prompt: str = Field(max_length=1024)
