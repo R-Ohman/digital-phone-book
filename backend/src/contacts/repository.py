@@ -30,6 +30,10 @@ class ContactRepository:
         await self.db.refresh(contact)
         return contact
 
+    async def get_by_name(self, name: str) -> Optional[Contact]:
+        result = await self.db.execute(select(Contact).where(Contact.name.ilike(name)))
+        return result.scalar_one_or_none()
+
     async def delete(self, contact: Contact) -> None:
         await self.db.delete(contact)
         await self.db.commit()

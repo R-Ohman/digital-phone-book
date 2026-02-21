@@ -37,7 +37,7 @@ async def get_contact(
     return contact
 
 
-@router.put("/{contact_id}", response_model=ContactResponse)
+@router.patch("/{contact_id}", response_model=ContactResponse)
 async def update_contact(
     contact_id: UUID,
     contact_update: ContactUpdate,

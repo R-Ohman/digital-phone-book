@@ -1,7 +1,5 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
-from alembic.config import Config
-from alembic import command
 
 from src.config import settings
 
@@ -22,8 +20,9 @@ Base = declarative_base()
 
 
 def run_migrations():
-    alembic_cfg = Config("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
+    import subprocess
+
+    subprocess.run(["alembic", "upgrade", "head"], check=True)
 
 
 async def get_db() -> AsyncSession:

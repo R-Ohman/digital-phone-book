@@ -1,11 +1,13 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import APIRouter, Depends
 
-from src.contacts import router
 from src.llm.deps import get_llm_service
 from src.llm.service import LLMService
 from src.llm.schemas import UserPrompt
+
+
+router = APIRouter(prefix="/llm", tags=["llm"])
 
 
 @router.post("/prompt")

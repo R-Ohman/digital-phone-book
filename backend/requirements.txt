@@ -9,4 +9,5 @@ structlog
 black
 ruff
 langchain
+langchain-classic
 langchain-ollama

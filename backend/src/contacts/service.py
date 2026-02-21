@@ -28,7 +28,7 @@ class ContactService:
         if not db_contact:
             return None
 
-        update_data = contact_update.model_dump(exclude_unset=True)
+        update_data = contact_update.model_dump(exclude_unset=True, exclude_none=True)
         for field, value in update_data.items():
             setattr(db_contact, field, value)
 
@@ -41,3 +41,24 @@ class ContactService:
 
         await self.repository.delete(db_contact)
         return True
+
+    async def get_by_name(self, name: str) -> Optional[Contact]:
+        return await self.repository.get_by_name(name)
+
+    async def delete_by_name(self, name: str) -> bool:
+        contact = await self.repository.get_by_name(name)
+        if not contact:
+            return False
+        await self.repository.delete(contact)
+        return True
+
+    async def update_by_name(
+        self, name: str, contact_update: ContactUpdate
+    ) -> Optional[Contact]:
+        contact = await self.repository.get_by_name(name)
+        if not contact:
+            return None
+        update_data = contact_update.model_dump(exclude_unset=True, exclude_none=True)
+        for field, value in update_data.items():
+            setattr(contact, field, value)
+        return await self.repository.update(contact)

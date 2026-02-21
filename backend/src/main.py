@@ -1,15 +1,17 @@
 from contextlib import asynccontextmanager
+import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.database import run_migrations
 from src.contacts.router import router as contacts_router
+from src.llm.router import router as llm_router
 from src.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    run_migrations()
+    await asyncio.to_thread(run_migrations)
     yield
 
 
@@ -26,3 +28,4 @@ app.add_middleware(
 )
 
 app.include_router(contacts_router)
+app.include_router(llm_router)

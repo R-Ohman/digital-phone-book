@@ -18,26 +18,6 @@ class Settings(BaseSettings):
 
     @computed_field
     @property
-    def parse_model(self) -> str:
-        return self.llm_model
-
-    @computed_field
-    @property
-    def response_model(self) -> str:
-        return self.llm_model
-
-    @computed_field
-    @property
-    def parse_llm_url(self) -> str:
-        return self.llm_url
-
-    @computed_field
-    @property
-    def response_llm_url(self) -> str:
-        return self.llm_url
-
-    @computed_field
-    @property
     def database_url(self) -> str:
         return (
             f"postgresql+asyncpg://{self.phonebook_db_user}:{self.phonebook_db_password}"
