@@ -1,0 +1,61 @@
+@use 'variables' as *;
+
+.contact-list {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: $space-3;
+
+  &__heading {
+    margin: 0;
+  }
+
+  &__content {
+    flex: 1 1 auto;
+    overflow: auto;
+  }
+
+  &__spinner {
+    width: 100%;
+    height: 3rem;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  &__actions-row {
+    display: flex;
+    gap: $space-2;
+  }
+
+  &__col-actions {
+    width: 10rem;
+  }
+
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
+  }
+
+  &__dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-2;
+  }
+
+  &__form-help {
+    margin: 0;
+    color: $color-secondary-text;
+  }
+
+  .p-dialog .p-dialog-content {
+    overflow: visible;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+  }
+}

@@ -1,1 +1,12 @@
-/* You can add global styles to this file, and also import other style files */
+@use 'styles/variables' as *;
+
+:root {
+  --p-content-background: transparent !important;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  overflow: hidden;
+  color: $color-text;
+  background: $color-surface-200 !important;
+}

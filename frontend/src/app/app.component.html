@@ -1,0 +1,11 @@
+<p-toast aria-live="polite" position="top-right"></p-toast>
+<p-confirmDialog></p-confirmDialog>
+
+<p-splitter [panelSizes]="[60, 40]">
+  <ng-template pTemplate="panel">
+    <app-contact-list></app-contact-list>
+  </ng-template>
+  <ng-template pTemplate="panel">
+    <app-chat-panel (refreshRequested)="onChatRefresh()"></app-chat-panel>
+  </ng-template>
+</p-splitter>

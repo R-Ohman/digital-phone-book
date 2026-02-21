@@ -1,0 +1,10 @@
+{
+  "/api": {
+    "target": "http://dpb_backend:8000",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/api": ""
+    }
+  }
+}
