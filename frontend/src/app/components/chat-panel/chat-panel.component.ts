@@ -23,7 +23,7 @@ import { finalize } from 'rxjs/operators';
 interface ChatMessage {
   role: 'user' | 'assistant';
   text: string;
-  surfaceId?: string;
+  surfaceIds?: string[];
 }
 
 @Component({
@@ -142,9 +142,23 @@ export class ChatPanelComponent {
       .pipe(finalize(() => this.sending.set(false)))
       .subscribe({
         next: (res) => {
-          let surfaceId: string | undefined;
+          let surfaceIds: string[] | undefined;
           if (res.a2UiMessages?.length) {
-            surfaceId = `contact-card-${Date.now()}`;
+            const ts = Date.now();
+            // Collect all distinct backend surface IDs
+            const backendIds = [
+              ...new Set(
+                (res.a2UiMessages as any[]).flatMap((msg) =>
+                  ['surfaceUpdate', 'dataModelUpdate', 'beginRendering', 'deleteSurface']
+                    .map((k) => msg[k]?.surfaceId)
+                    .filter(Boolean),
+                ),
+              ),
+            ] as string[];
+            // Map each backend surface ID to a unique runtime surface ID
+            const idMap = new Map<string, string>(
+              backendIds.map((id, i) => [id, `${id}-${ts}-${i}`]),
+            );
             const remapped = (res.a2UiMessages as any[]).map((msg) => {
               const clone = JSON.parse(JSON.stringify(msg));
               for (const key of [
@@ -154,25 +168,30 @@ export class ChatPanelComponent {
                 'deleteSurface',
               ]) {
                 if (clone[key]?.surfaceId) {
-                  clone[key].surfaceId = surfaceId;
+                  clone[key].surfaceId = idMap.get(clone[key].surfaceId) ?? clone[key].surfaceId;
                 }
               }
               return clone;
             });
             this.processor.processMessages(remapped);
             this.surfaces.set(new Map(this.processor.getSurfaces()));
-            // Map contact id -> surfaceId so the delete handler can update the surface.
-            const deleteBtn = (res.a2UiMessages as any[])
-              .find((m) => m.surfaceUpdate)
-              ?.surfaceUpdate?.components?.find((c: any) => c.id === 'delete-btn');
-            const contactId: string | undefined =
-              deleteBtn?.component?.Button?.action?.context?.find((c: any) => c.key === 'id')?.value
-                ?.literalString;
-            if (contactId) this.#contactSurfaceMap.set(contactId, surfaceId!);
+            surfaceIds = [...idMap.values()];
+            // Map contact id -> runtime surfaceId so the delete handler can update the surface.
+            for (const msg of remapped) {
+              if (msg.surfaceUpdate) {
+                const deleteBtn = msg.surfaceUpdate.components?.find(
+                  (c: any) => c.id === 'delete-btn',
+                );
+                const contactId: string | undefined =
+                  deleteBtn?.component?.Button?.action?.context?.find((c: any) => c.key === 'id')
+                    ?.value?.literalString;
+                if (contactId) this.#contactSurfaceMap.set(contactId, msg.surfaceUpdate.surfaceId);
+              }
+            }
           }
           this.messages.update((arr) => [
             ...arr,
-            { role: 'assistant', text: res.message, surfaceId },
+            { role: 'assistant', text: res.message, surfaceIds },
           ]);
           this.refreshRequested.emit();
         },

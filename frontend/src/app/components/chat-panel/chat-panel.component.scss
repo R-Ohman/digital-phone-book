@@ -74,6 +74,12 @@
     width: 1rem;
     height: 1rem;
   }
+
+  &__surfaces {
+    display: flex;
+    gap: $space-3;
+    flex-wrap: wrap;
+  }
 }
 
 a2ui-surface {

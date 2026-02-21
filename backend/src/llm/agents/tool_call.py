@@ -23,12 +23,9 @@ from .schemas import (
 )
 
 
-_CONTACT_CARD_SURFACE_ID = "contact-card"
-
-
 def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
     """Return the three A2UI v0.8 messages that render a contact card surface."""
-    surface_id = _CONTACT_CARD_SURFACE_ID
+    surface_id = f"contact-card-{contact_id}"
     return [
         {
             "surfaceUpdate": {
@@ -202,20 +199,36 @@ class ToolCallAgent:
         result = await self._executor.ainvoke({"input": user_prompt})
         raw_output: str = result.get("output", "") or ""
 
-        a2ui_messages: Optional[List] = None
+        a2ui_messages: List = []
+        seen_contact_ids: set = set()
         for action, observation in result.get("intermediate_steps", []):
-            if getattr(action, "tool", None) == "get_contact":
+            tool = getattr(action, "tool", None)
+            if tool == "get_contact":
                 try:
                     data = json.loads(observation)
-                    if data.get("found"):
-                        a2ui_messages = _build_contact_card_a2ui(
-                            data["name"], data["phone_number"], data["id"]
+                    if data.get("found") and data["id"] not in seen_contact_ids:
+                        seen_contact_ids.add(data["id"])
+                        a2ui_messages.extend(
+                            _build_contact_card_a2ui(
+                                data["name"], data["phone_number"], data["id"]
+                            )
                         )
                 except (json.JSONDecodeError, KeyError):
                     pass
-                break
+            elif tool in ("add_contact", "update_contact"):
+                try:
+                    data = json.loads(observation)
+                    if data.get("success") and data["id"] not in seen_contact_ids:
+                        seen_contact_ids.add(data["id"])
+                        a2ui_messages.extend(
+                            _build_contact_card_a2ui(
+                                data["name"], data["phone_number"], data["id"]
+                            )
+                        )
+                except (json.JSONDecodeError, KeyError):
+                    pass
 
-        return raw_output.strip(), a2ui_messages
+        return raw_output.strip(), a2ui_messages if a2ui_messages else None
 
     def _make_service(self, session: AsyncSession) -> ContactService:
         return ContactService(ContactRepository(session))
@@ -254,6 +267,7 @@ class ToolCallAgent:
                 return json.dumps(
                     {
                         "success": True,
+                        "id": str(contact.id),
                         "name": contact.name,
                         "phone_number": contact.phone_number,
                     }
@@ -268,10 +282,17 @@ class ToolCallAgent:
             return json.dumps({"success": deleted, "name": name})
 
         async def update_contact(
-            name: str,
+            name: Optional[str] = None,
             new_name: Optional[str] = None,
             new_phone_number: Optional[str] = None,
         ) -> str:
+            if not name:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "error": "Missing required field: 'name' (the current name of the contact to update)",
+                    }
+                )
             async with self._session_factory() as session:
                 svc = self._make_service(session)
                 contact = await svc.update_by_name(
@@ -284,6 +305,7 @@ class ToolCallAgent:
             return json.dumps(
                 {
                     "success": True,
+                    "id": str(contact.id),
                     "name": contact.name,
                     "phone_number": contact.phone_number,
                 }

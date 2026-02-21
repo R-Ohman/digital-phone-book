@@ -21,8 +21,13 @@ class DeleteContactInput(BaseModel):
 
 
 class UpdateContactInput(BaseModel):
-    name: str = Field(description="Current name of the contact to update")
-    new_name: Optional[str] = Field(None, description="New name for the contact")
+    name: Optional[str] = Field(
+        description="Current name of the contact to update. This is REQUIRED - you must provide the existing contact name to look up."
+    )
+    new_name: Optional[str] = Field(
+        None, description="New name for the contact (leave None to keep unchanged)"
+    )
     new_phone_number: Optional[str] = Field(
-        None, description="New phone number for the contact"
+        None,
+        description="New phone number for the contact (leave None to keep unchanged)",
     )
