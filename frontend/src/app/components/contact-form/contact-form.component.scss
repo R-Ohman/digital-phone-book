@@ -1,0 +1,25 @@
+@use 'variables' as *;
+
+.contact-form {
+  &__form {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+
+  &__dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: $space-2;
+  }
+
+  &__form-help {
+    margin: 0;
+    color: $color-secondary-text;
+  }
+
+  &__field {
+    display: flex;
+    flex-direction: column;
+  }
+}

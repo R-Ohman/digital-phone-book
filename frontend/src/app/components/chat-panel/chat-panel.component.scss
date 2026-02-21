@@ -53,10 +53,6 @@
     gap: $space-2;
     margin-bottom: $space-2;
 
-    button {
-      border-radius: $radius-xl;
-    }
-
     &--sending {
       opacity: 0.7;
     }
@@ -75,7 +71,7 @@
   }
 
   &__spinner {
-    width: 2rem;
-    height: 2rem;
+    width: 1rem;
+    height: 1rem;
   }
 }

@@ -4,6 +4,7 @@ import { ToastModule } from 'primeng/toast';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ContactListComponent } from '@components/contact-list/contact-list.component';
 import { ChatPanelComponent } from '@components/chat-panel/chat-panel.component';
+import { ConfirmPopup } from 'primeng/confirmpopup';
 
 @Component({
   selector: 'app-root',
@@ -13,6 +14,7 @@ import { ChatPanelComponent } from '@components/chat-panel/chat-panel.component'
     ConfirmDialogModule,
     ContactListComponent,
     ChatPanelComponent,
+    ConfirmPopup,
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',

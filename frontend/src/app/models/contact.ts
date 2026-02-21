@@ -1,3 +1,5 @@
+export type ContactCreate = Omit<Contact, 'id'>;
+
 export type Contact = ContactDto;
 
 export interface ContactDto {

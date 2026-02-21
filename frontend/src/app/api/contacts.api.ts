@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { map, Observable } from 'rxjs';
-import { Contact, ContactDto, toDto, toModel } from '@models/contact';
+import { Contact, ContactCreate, ContactDto, toDto, toModel } from '@models/contact';
 
 @Injectable({ providedIn: 'root' })
 export class ContactsApi {
@@ -12,7 +12,7 @@ export class ContactsApi {
     return this.#http.get<ContactDto[]>(this.#base).pipe(map((dtos) => dtos.map(toModel)));
   }
 
-  create(contact: Omit<Contact, 'id'>): Observable<Contact> {
+  create(contact: ContactCreate): Observable<Contact> {
     return this.#http.post<ContactDto>(this.#base, toDto(contact)).pipe(map(toModel));
   }
 

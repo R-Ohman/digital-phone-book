@@ -36,32 +36,33 @@ interface ChatMessage {
 })
 export class ChatPanelComponent {
   refreshRequested = output<void>();
-  messages = signal<ChatMessage[]>([]);
+  messages = signal<ChatMessage[]>([
+    { role: 'assistant', text: 'Hi there! How can I assist you?' },
+  ]);
   sending = signal<boolean>(false);
   inputDisabled = computed(() => this.sending());
   readonly #llmApi = inject(LlmApi);
   readonly #formBuilder = inject(FormBuilder).nonNullable;
-  form = this.#formBuilder.group({
-    input: ['', [Validators.maxLength(1024)]],
-  });
+
+  promptInput = this.#formBuilder.control<string>('', [Validators.maxLength(1024)]);
+
   readonly #messageService = inject(MessageService);
 
   send(): void {
-    if (this.form.invalid || this.sending()) return;
-    const prompt = this.form.controls.input.value.trim();
+    if (this.promptInput.invalid || this.sending()) return;
+    const prompt = this.promptInput.value.trim();
     if (!prompt) return;
 
     this.sending.set(true);
     this.messages.update((arr) => [...arr, { role: 'user', text: prompt }]);
 
+    this.promptInput.reset();
     this.#llmApi
       .sendPrompt({ prompt })
       .pipe(finalize(() => this.sending.set(false)))
       .subscribe({
         next: (res) => {
           this.messages.update((arr) => [...arr, { role: 'assistant', text: res.message }]);
-          this.form.reset({ input: '' });
-          // After any successful response, request a refresh of contacts per requirements
           this.refreshRequested.emit();
         },
         error: (err: unknown) => {

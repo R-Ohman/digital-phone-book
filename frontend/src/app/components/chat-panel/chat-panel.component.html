@@ -16,6 +16,7 @@
       <div class="chat-panel__message chat-panel__message--assistant">
         <div class="chat-panel__bubble" data-role="assistant">
           <p-progressSpinner class="chat-panel__spinner" ariaLabel="Waiting for response"></p-progressSpinner>
+          Thinking...
         </div>
       </div>
     }
@@ -23,11 +24,11 @@
 
   <form (ngSubmit)="send()" [class.chat-panel__composer--sending]="sending()" class="chat-panel__composer" novalidate>
     <div class="chat-panel__field">
-      <input [disabled]="inputDisabled()" [formControl]="form.controls.input" aria-label="Message"
+      <input [disabled]="inputDisabled()" [formControl]="promptInput" aria-label="Message"
              class="chat-panel__input"
              pInputText
              placeholder="Type a command, e.g. Add John with number 123..." type="text"/>
     </div>
-    <button [disabled]="inputDisabled()" icon="pi pi-send" label="Send" pButton type="submit"></button>
+    <button [disabled]="inputDisabled()" [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
   </form>
 </div>

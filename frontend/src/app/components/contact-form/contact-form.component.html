@@ -1,0 +1,32 @@
+<form (ngSubmit)="onSubmit()" [formGroup]="form()" aria-describedby="form-help" class="contact-form__form">
+  <div class="contact-form__field">
+    <label for="name">Name</label>
+    <input formControlName="name" id="name" maxlength="100" pInputText required type="text"/>
+    @if (form().controls.name.invalid && form().controls.name.touched) {
+      <small class="p-error" role="alert">
+        Name is required
+      </small>
+    }
+  </div>
+  <div class="contact-form__field">
+    <label for="phone">Phone Number</label>
+    <input formControlName="phoneNumber" id="phone" maxlength="20" pInputText required
+           type="tel"/>
+
+    @if (form().controls.phoneNumber.invalid && form().controls.phoneNumber.touched) {
+      <small class="p-error" role="alert">
+        @if (form().controls.phoneNumber.errors?.['required']) {
+          Phone number is required
+        } @else {
+          Phone number is invalid
+        }
+      </small>
+    }
+  </div>
+  <p class="contact-form__form-help" id="form-help">All fields are required.</p>
+  <div class="contact-form__dialog-actions">
+    <button (click)="onCancel()" class="p-button-text" label="Cancel" pButton
+            type="button"></button>
+    <button [disabled]="form().invalid" icon="pi pi-check" label="Save" pButton type="submit"></button>
+  </div>
+</form>

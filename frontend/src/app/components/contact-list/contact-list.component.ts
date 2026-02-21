@@ -1,18 +1,8 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  OnInit,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { TableModule } from 'primeng/table';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
-import { InputTextModule } from 'primeng/inputtext';
 import { ToolbarModule } from 'primeng/toolbar';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmationService, MessageService } from 'primeng/api';
@@ -20,61 +10,37 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { ContactsApi } from '@api/contacts.api';
 import { finalize } from 'rxjs/operators';
 import { Contact } from '@models/contact';
+import { ContactFormComponent } from '../contact-form/contact-form.component';
 
 @Component({
   selector: 'app-contact-list',
   imports: [
     CommonModule,
-    ReactiveFormsModule,
     TableModule,
     ButtonModule,
     DialogModule,
-    InputTextModule,
     ToolbarModule,
     ConfirmDialogModule,
     ProgressSpinnerModule,
+    ContactFormComponent,
   ],
   templateUrl: './contact-list.component.html',
   styleUrl: './contact-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ContactListComponent implements OnInit {
-  // State signals
+  readonly #contactsApi = inject(ContactsApi);
+  readonly #confirmationService = inject(ConfirmationService);
+  readonly #messageService = inject(MessageService);
+
   contacts = signal<Contact[]>([]);
   loading = signal<boolean>(false);
   dialogVisible = signal<boolean>(false);
   saving = signal<boolean>(false);
   editing = signal<boolean>(false);
   selected = signal<Contact | null>(null);
-  formDisabled = computed(() => this.saving() || this.loading());
-  readonly #contactsApi = inject(ContactsApi);
-  readonly #confirmationService = inject(ConfirmationService);
-  readonly #messageService = inject(MessageService);
-  readonly #formBuilder = inject(FormBuilder).nonNullable;
-  // Reactive form
-  form: FormGroup = this.#formBuilder.group({
-    name: ['', [Validators.required, Validators.maxLength(100)]],
-    phoneNumber: ['', [Validators.required, Validators.maxLength(20)]],
-  });
 
-  constructor() {
-    // When switching selected/editing, patch form
-    effect(() => {
-      const contact = this.selected();
-      if (contact) {
-        this.form.reset({
-          name: contact.name,
-          phoneNumber: contact.phoneNumber,
-        });
-      } else {
-        this.form.reset({ name: '', phoneNumber: '' });
-      }
-    });
-  }
-
-  get submitDisabled() {
-    return this.form.invalid || this.formDisabled();
-  }
+  constructor() {}
 
   ngOnInit(): void {
     this.refresh();
@@ -103,13 +69,9 @@ export class ContactListComponent implements OnInit {
     this.dialogVisible.set(true);
   }
 
-  save(): void {
-    if (this.form.invalid || this.saving()) return;
+  onSubmit(value: { name: string; phoneNumber: string }): void {
+    if (this.saving()) return;
     this.saving.set(true);
-    const value = {
-      name: String(this.form.get('name')!.value).trim(),
-      phoneNumber: String(this.form.get('phoneNumber')!.value).trim(),
-    };
     const req$ =
       this.editing() && this.selected()
         ? this.#contactsApi.update(this.selected()!.id, value)
@@ -129,14 +91,27 @@ export class ContactListComponent implements OnInit {
     });
   }
 
-  confirmDelete(contact: Contact): void {
+  onCancel(): void {
+    if (!this.saving()) {
+      this.dialogVisible.set(false);
+    }
+  }
+
+  confirmDelete(contact: Contact, event: Event): void {
     this.#confirmationService.confirm({
-      message: `Delete ${contact.name}?`,
+      target: event.currentTarget as EventTarget,
+      message: `Are you sure you want to delete ${contact.name}?`,
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Delete',
-      rejectLabel: 'Cancel',
-      acceptButtonStyleClass: 'p-button-danger',
+      rejectButtonProps: {
+        label: 'Cancel',
+        severity: 'secondary',
+        outlined: true,
+      },
+      acceptButtonProps: {
+        label: 'Delete',
+        severity: 'danger',
+      },
       accept: () => this.#delete(contact),
     });
   }

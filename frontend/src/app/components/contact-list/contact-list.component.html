@@ -1,7 +1,7 @@
 <div class="contact-list">
   <p-toolbar>
     <h2 class="contact-list__heading" id="contacts-heading">Contacts</h2>
-    <button (click)="openAdd()" [disabled]="loading()" icon="pi pi-plus" label="Add Contact" pButton
+    <button (click)="openAdd()" [disabled]="loading()" icon="pi pi-plus" label="Add Contact" [rounded]="true" pButton
             type="button"></button>
   </p-toolbar>
 
@@ -24,9 +24,9 @@
             <td><a href="tel:{{ row.phoneNumber }}">{{ row.phoneNumber }}</a></td>
             <td>
               <div class="contact-list__actions-row">
-                <button pButton type="button" icon="pi pi-pencil" label="Edit" (click)="openEdit(row)"></button>
-                <button pButton type="button" icon="pi pi-trash" label="Delete" [disabled]="loading()"
-                        class="p-button-danger" (click)="confirmDelete(row)"></button>
+                <button pButton type="button" icon="pi pi-pencil" label="Edit" [rounded]="true" (click)="openEdit(row)"></button>
+                <button pButton type="button" icon="pi pi-trash" label="Delete" [rounded]="true" [disabled]="loading()"
+                        class="p-button-danger" (click)="confirmDelete(row, $event)" ></button>
               </div>
             </td>
           </tr>
@@ -44,30 +44,10 @@
             [draggable]="false"
             [header]="editing() ? 'Edit Contact' : 'Add Contact'" [modal]="true" [resizable]="false" [style]="{width: '32rem'}"
             [visible]="dialogVisible()" ariaLabel="Contact form dialog">
-    <form (ngSubmit)="save()" [formGroup]="form" aria-describedby="form-help" class="contact-list__form">
-      <div class="contact-list__field">
-        <label for="name">Name</label>
-        <input [disabled]="formDisabled()" formControlName="name" id="name" maxlength="100" pInputText required
-               type="text"/>
-        @if (form.get('name')?.invalid && (form.get('name')?.dirty || form.get('name')?.touched)) {
-          <small class="p-error" role="alert">Name is required</small>
-        }
-      </div>
-      <div class="contact-list__field">
-        <label for="phone">Phone Number</label>
-        <input [disabled]="formDisabled()" formControlName="phoneNumber" id="phone" maxlength="20" pInputText required
-               type="tel"/>
-        @if (form.get('phoneNumber')?.invalid && (form.get('phoneNumber')?.dirty || form.get('phoneNumber')?.touched)) {
-          <small class="p-error" role="alert">Phone number is required</small>
-        }
-      </div>
-      <p class="contact-list__form-help" id="form-help">All fields are required.</p>
-      <div class="contact-list__dialog-actions">
-        <button (click)="dialogVisible.set(false)" [disabled]="saving()" class="p-button-text" label="Cancel"
-                pButton
-                type="button"></button>
-        <button [disabled]="submitDisabled" icon="pi pi-check" label="Save" pButton type="submit"></button>
-      </div>
-    </form>
+    <app-contact-form
+      [model]="selected() ?? undefined"
+      (submit)="onSubmit($event)"
+      (cancel)="onCancel()"
+    ></app-contact-form>
   </p-dialog>
 </div>

@@ -33,29 +33,11 @@
     width: 10rem;
   }
 
-  &__form {
-    display: flex;
-    flex-direction: column;
-    gap: $space-3;
-  }
-
-  &__dialog-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: $space-2;
-  }
-
-  &__form-help {
-    margin: 0;
-    color: $color-secondary-text;
+  .p-toolbar {
+    border-radius: $radius-xl;
   }
 
   .p-dialog .p-dialog-content {
     overflow: visible;
-  }
-
-  &__field {
-    display: flex;
-    flex-direction: column;
   }
 }
