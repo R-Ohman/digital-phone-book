@@ -36,7 +36,6 @@ export class ChatService {
 
   readonly refreshRequested$ = new Subject<void>();
 
-  readonly #contactSurfaceMap = new Map<string, string>();
   #editSurfaceId = '';
 
   constructor() {
@@ -173,7 +172,6 @@ export class ChatService {
       },
     ]);
     this.surfaces.set(new Map(this.processor.getSurfaces()));
-    this.#contactSurfaceMap.set(contact.id, surfaceId);
     this.refreshRequested$.next();
   }
 
@@ -194,27 +192,50 @@ export class ChatService {
     this.processor.processMessages(messages);
     this.surfaces.set(new Map(this.processor.getSurfaces()));
 
-    for (const msg of messages) {
-      if (msg.surfaceUpdate) {
-        const deleteBtn = msg.surfaceUpdate.components?.find((c) => c.id === 'delete-btn');
-        const buttonComp = deleteBtn?.component as
-          | {
-              Button?: {
-                action?: { context?: Array<{ key: string; value?: { literalString?: string } }> };
-              };
-            }
-          | undefined;
-        const contactId = buttonComp?.Button?.action?.context?.find((c) => c.key === 'id')?.value
-          ?.literalString;
-        if (contactId) this.#contactSurfaceMap.set(contactId, msg.surfaceUpdate.surfaceId);
-      }
-    }
-
     this.messages.update((arr) => {
       const copy = [...arr];
       copy[assistantIdx] = { ...copy[assistantIdx], surfaceIds: [...backendIds] };
       return copy;
     });
+  }
+
+  #removeContactFromSurfaces(contactId: string): void {
+    const allSurfaces = this.processor.getSurfaces();
+    const surfaceMessages: Types.ServerToClientMessage[] = [];
+    const deletedSurfaceIds: string[] = [];
+
+    for (const [surfaceId] of allSurfaces) {
+      if (surfaceId.startsWith('contact-card-') && surfaceId.endsWith(contactId)) {
+        surfaceMessages.push({
+          surfaceUpdate: {
+            surfaceId,
+            components: [
+              {
+                id: 'actions',
+                component: { List: { children: { explicitList: ['call-btn'] } } },
+              },
+            ],
+          },
+        });
+      } else if (surfaceId.startsWith('delete-confirm-') && surfaceId.endsWith(contactId)) {
+        surfaceMessages.push({ deleteSurface: { surfaceId } });
+        deletedSurfaceIds.push(surfaceId);
+      }
+    }
+
+    if (surfaceMessages.length) {
+      this.processor.processMessages(surfaceMessages);
+      this.surfaces.set(new Map(this.processor.getSurfaces()));
+    }
+
+    if (deletedSurfaceIds.length) {
+      this.messages.update((arr) =>
+        arr.map((msg) => ({
+          ...msg,
+          surfaceIds: msg.surfaceIds?.filter((id) => !deletedSurfaceIds.includes(id)),
+        })),
+      );
+    }
   }
 
   #removeSurface(surfaceId: string): void {
@@ -279,7 +300,6 @@ export class ChatService {
   #handleDeleteAction(event: DispatchedEvent, userAction: UserAction): void {
     const id = (userAction.context?.['id'] as string | undefined) ?? '';
     const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
-    const surfaceId = this.#contactSurfaceMap.get(id);
 
     this.#confirmationService.confirm({
       message: `Are you sure you want to delete ${name}?`,
@@ -295,22 +315,7 @@ export class ChatService {
               summary: 'Deleted',
               detail: `${name} deleted`,
             });
-            if (surfaceId) {
-              this.processor.processMessages([
-                {
-                  surfaceUpdate: {
-                    surfaceId,
-                    components: [
-                      {
-                        id: 'actions',
-                        component: { List: { children: { explicitList: ['call-btn'] } } },
-                      },
-                    ],
-                  },
-                },
-              ]);
-              this.surfaces.set(new Map(this.processor.getSurfaces()));
-            }
+            this.#removeContactFromSurfaces(id);
             event.completion.next([]);
             event.completion.complete();
             this.refreshRequested$.next();
@@ -333,7 +338,6 @@ export class ChatService {
   #handleConfirmDeleteAction(event: DispatchedEvent, userAction: UserAction): void {
     const id = (userAction.context?.['id'] as string | undefined) ?? '';
     const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
-    const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
 
     this.#contactsApi.delete(id).subscribe({
       next: () => {
@@ -342,7 +346,7 @@ export class ChatService {
           summary: 'Deleted',
           detail: `${name} deleted`,
         });
-        if (surfaceId) this.#removeSurface(surfaceId);
+        this.#removeContactFromSurfaces(id);
         event.completion.next([]);
         event.completion.complete();
         this.refreshRequested$.next();

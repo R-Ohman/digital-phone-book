@@ -9,3 +9,18 @@ body {
   overflow: hidden;
   color: $color-text;
 }
+
+::-webkit-scrollbar {
+  width: 14px;
+
+  &-thumb {
+    border: 5px solid transparent;
+    background-clip: content-box;
+    border-radius: 100px;
+    background-color: $color-secondary-text;
+
+    &:hover {
+      border: 3px solid transparent;
+    }
+  }
+}
