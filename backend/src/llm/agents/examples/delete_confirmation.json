@@ -1,7 +1,7 @@
 [
   {
     "surfaceUpdate": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "components": [
         { "id": "root", "component": { "Card": { "child": "contentColumn" } } },
         {
@@ -20,9 +20,7 @@
           "id": "confirmationText",
           "component": {
             "Text": {
-              "text": {
-                "literalString": "Are you sure you want to delete this contact?"
-              },
+              "text": { "literalString": "Are you sure you want to delete this contact?" },
               "usageHint": "h3"
             }
           }
@@ -39,16 +37,13 @@
         {
           "id": "contactName",
           "component": {
-            "Text": { "text": { "path": "/contact/name" }, "usageHint": "h4" }
+            "Text": { "text": { "path": "name" }, "usageHint": "h4" }
           }
         },
         {
           "id": "contactPhone",
           "component": {
-            "Text": {
-              "text": { "path": "/contact/phone_number" },
-              "usageHint": "body"
-            }
+            "Text": { "text": { "path": "phone" }, "usageHint": "body" }
           }
         },
         {
@@ -75,15 +70,9 @@
               "action": {
                 "name": "confirm-delete",
                 "context": [
-                  {
-                    "key": "id",
-                    "value": { "literalString": "__CONTACT_ID__" }
-                  },
-                  { "key": "name", "value": { "literalString": "__NAME__" } },
-                  {
-                    "key": "surfaceId",
-                    "value": { "literalString": "__SURFACE_ID__" }
-                  }
+                  { "key": "id",        "value": { "path": "id" } },
+                  { "key": "name",      "value": { "path": "name" } },
+                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
                 ]
               }
             }
@@ -101,10 +90,7 @@
               "action": {
                 "name": "cancel-delete",
                 "context": [
-                  {
-                    "key": "surfaceId",
-                    "value": { "literalString": "__SURFACE_ID__" }
-                  }
+                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
                 ]
               }
             }
@@ -115,21 +101,18 @@
   },
   {
     "dataModelUpdate": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "contents": [
-        {
-          "key": "contact",
-          "valueMap": [
-            { "key": "name", "valueString": "__NAME__" },
-            { "key": "phone_number", "valueString": "__PHONE__" }
-          ]
-        }
+        { "key": "name",      "valueString": "" },
+        { "key": "phone",     "valueString": "" },
+        { "key": "id",        "valueString": "" },
+        { "key": "surfaceId", "valueString": "" }
       ]
     }
   },
   {
     "beginRendering": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "root": "root"
     }
   }

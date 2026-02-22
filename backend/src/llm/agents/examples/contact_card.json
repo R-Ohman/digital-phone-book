@@ -1,7 +1,7 @@
 [
   {
     "surfaceUpdate": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "components": [
         { "id": "root", "component": { "Card": { "child": "main-column" } } },
         {
@@ -32,10 +32,7 @@
         {
           "id": "name-text",
           "component": {
-            "Text": {
-              "text": { "literalString": "__NAME__" },
-              "usageHint": "h2"
-            }
+            "Text": { "text": { "path": "name" }, "usageHint": "h2" }
           }
         },
         {
@@ -50,10 +47,7 @@
               "action": {
                 "name": "close",
                 "context": [
-                  {
-                    "key": "surfaceId",
-                    "value": { "literalString": "__SURFACE_ID__" }
-                  }
+                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
                 ]
               }
             }
@@ -74,7 +68,7 @@
         },
         {
           "id": "phone-text",
-          "component": { "Text": { "text": { "literalString": "__PHONE__" } } }
+          "component": { "Text": { "text": { "path": "phone" } } }
         },
         {
           "id": "actions",
@@ -98,7 +92,7 @@
               "action": {
                 "name": "call",
                 "context": [
-                  { "key": "phone", "value": { "literalString": "__PHONE__" } }
+                  { "key": "phone", "value": { "path": "phone" } }
                 ]
               }
             }
@@ -116,16 +110,10 @@
               "action": {
                 "name": "edit",
                 "context": [
-                  {
-                    "key": "id",
-                    "value": { "literalString": "__CONTACT_ID__" }
-                  },
-                  { "key": "name", "value": { "literalString": "__NAME__" } },
-                  { "key": "phone", "value": { "literalString": "__PHONE__" } },
-                  {
-                    "key": "surfaceId",
-                    "value": { "literalString": "__SURFACE_ID__" }
-                  }
+                  { "key": "id",        "value": { "path": "id" } },
+                  { "key": "name",      "value": { "path": "name" } },
+                  { "key": "phone",     "value": { "path": "phone" } },
+                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
                 ]
               }
             }
@@ -143,11 +131,8 @@
               "action": {
                 "name": "delete",
                 "context": [
-                  {
-                    "key": "id",
-                    "value": { "literalString": "__CONTACT_ID__" }
-                  },
-                  { "key": "name", "value": { "literalString": "__NAME__" } }
+                  { "key": "id",   "value": { "path": "id" } },
+                  { "key": "name", "value": { "path": "name" } }
                 ]
               }
             }
@@ -158,16 +143,18 @@
   },
   {
     "dataModelUpdate": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "contents": [
-        { "key": "name", "valueString": "__NAME__" },
-        { "key": "phone", "valueString": "__PHONE__" }
+        { "key": "name",      "valueString": "" },
+        { "key": "phone",     "valueString": "" },
+        { "key": "id",        "valueString": "" },
+        { "key": "surfaceId", "valueString": "" }
       ]
     }
   },
   {
     "beginRendering": {
-      "surfaceId": "__SURFACE_ID__",
+      "surfaceId": "",
       "root": "root"
     }
   }

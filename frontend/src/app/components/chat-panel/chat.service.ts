@@ -32,9 +32,7 @@ export class ChatService {
   readonly surfaces = signal<ReadonlyMap<string, Types.Surface>>(new Map());
   readonly editDialogVisible = signal<boolean>(false);
   readonly editingContact = signal<Contact | null>(null);
-  readonly messages = signal<ChatMessage[]>([
-    { role: 'assistant', text: 'Hi there! How can I assist you?' },
-  ]);
+  readonly messages = signal<ChatMessage[]>([]);
 
   readonly refreshRequested$ = new Subject<void>();
 

@@ -1,17 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { ContactsApi } from '@api/contacts.api';
+import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
 import { Contact } from '@models/contact';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ConfirmPopup } from 'primeng/confirmpopup';
 import { DialogModule } from 'primeng/dialog';
+import { ProgressBarModule } from 'primeng/progressbar';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TableModule } from 'primeng/table';
 import { ToolbarModule } from 'primeng/toolbar';
 import { finalize } from 'rxjs/operators';
-import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
 
 @Component({
   selector: 'app-contact-list',
@@ -25,6 +26,7 @@ import { ContactFormDialogComponent } from '@components/contact-form-dialog/cont
     ProgressSpinnerModule,
     ConfirmPopup,
     ContactFormDialogComponent,
+    ProgressBarModule,
   ],
   templateUrl: './contact-list.component.html',
   styleUrl: './contact-list.component.scss',
@@ -82,10 +84,12 @@ export class ContactListComponent implements OnInit {
         label: 'Cancel',
         severity: 'secondary',
         outlined: true,
+        rounded: true,
       },
       acceptButtonProps: {
         label: 'Delete',
         severity: 'danger',
+        rounded: true,
       },
       accept: () => this.#delete(contact),
     });

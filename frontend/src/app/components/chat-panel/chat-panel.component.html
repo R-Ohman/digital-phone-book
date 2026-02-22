@@ -4,49 +4,61 @@
     <h2>AI Assistant</h2>
   </div>
 
-  <div aria-labelledby="chat-heading" aria-live="polite" class="chat-panel__messages" role="log">
-    @for (message of chat.messages(); track $index) {
-      <div [class]="['chat-panel__message', 'chat-panel__message--' + message.role]">
-        <div
-          class="chat-panel__bubble"
-          [attr.aria-label]="message.role === 'user' ? 'You' : 'Assistant'"
-          [innerHTML]="message.text | markdown"
-        ></div>
-      </div>
+  <div class="chat-panel__body">
+    <div
+      aria-labelledby="chat-heading"
+      aria-live="polite"
+      [class]="{
+        'chat-panel__messages': true,
+        'chat-panel__messages--empty': !chat.messages().length,
+      }"
+      role="log"
+    >
+      @for (message of chat.messages(); track $index) {
+        <div [class]="['chat-panel__message', 'chat-panel__message--' + message.role]">
+          <div
+            class="chat-panel__bubble"
+            [attr.aria-label]="message.role === 'user' ? 'You' : 'Assistant'"
+            [innerHTML]="message.text | markdown"
+          ></div>
+        </div>
 
-      <div class="chat-panel__surfaces">
-        @for (surfaceId of message.surfaceIds ?? []; track surfaceId) {
-          @if (chat.surfaces().get(surfaceId); as surface) {
-            <div class="chat-panel__message chat-panel__message--assistant">
-              <a2ui-surface [id]="surfaceId" [surfaceId]="surfaceId" [surface]="surface" />
-            </div>
+        <div class="chat-panel__surfaces">
+          @for (surfaceId of message.surfaceIds ?? []; track surfaceId) {
+            @if (chat.surfaces().get(surfaceId); as surface) {
+              <div class="chat-panel__message chat-panel__message--assistant">
+                <a2ui-surface [id]="surfaceId" [surfaceId]="surfaceId" [surface]="surface" />
+              </div>
+            }
           }
-        }
-      </div>
-    }
-    @if (chat.sending() && !chat.streamingStarted()) {
-      <app-chat-loading />
-    }
-  </div>
-
-  <form
-    (ngSubmit)="send()"
-    [class.chat-panel__composer--sending]="chat.sending()"
-    class="chat-panel__composer"
-    novalidate
-  >
-    <div class="chat-panel__field">
-      <input
-        [formControl]="promptInput"
-        aria-label="Message"
-        class="chat-panel__input"
-        pInputText
-        placeholder="Type a command, e.g. Add John with number 123..."
-        type="text"
-      />
+        </div>
+      } @empty {
+        <h2 class="chat-panel__empty-heading">Where should we begin?</h2>
+      }
+      @if (chat.sending() && !chat.streamingStarted()) {
+        <app-chat-loading />
+      }
     </div>
-    <button [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
-  </form>
+
+    <form
+      (ngSubmit)="send()"
+      [class.chat-panel__composer--sending]="chat.sending()"
+      class="chat-panel__composer"
+      novalidate
+    >
+      <div class="chat-panel__field">
+        <input
+          [formControl]="promptInput"
+          aria-label="Message"
+          class="chat-panel__input"
+          pInputText
+          placeholder="Type a command, e.g. Add John with number 123..."
+          type="text"
+        />
+      </div>
+      <button [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
+    </form>
+  </div>
 </div>
 
 <p-confirmDialog />

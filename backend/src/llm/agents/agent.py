@@ -7,6 +7,7 @@ from langchain_ollama import ChatOllama
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.config import settings
+from src.contacts.schemas import ContactResponse
 from .prompt_builder import PROMPT
 from .tools import build_tools
 from .ui_builder import build_contact_card, build_delete_confirmation
@@ -124,7 +125,7 @@ class ToolCallAgent:
                 if data.get("found") and cid not in seen_ids and cid not in confirm_ids:
                     seen_ids.add(cid)
                     a2ui_messages.extend(
-                        build_contact_card(data["name"], data["phone_number"], cid)
+                        build_contact_card(ContactResponse.model_validate(data))
                     )
 
             elif tool in ("add_contact", "update_contact"):
@@ -132,7 +133,7 @@ class ToolCallAgent:
                 if data.get("success") and cid not in seen_ids:
                     seen_ids.add(cid)
                     a2ui_messages.extend(
-                        build_contact_card(data["name"], data["phone_number"], cid)
+                        build_contact_card(ContactResponse.model_validate(data))
                     )
 
             elif tool == "propose_delete_contact":
@@ -140,9 +141,7 @@ class ToolCallAgent:
                 if data.get("proposed") and cid not in seen_confirm_ids:
                     seen_confirm_ids.add(cid)
                     a2ui_messages.extend(
-                        build_delete_confirmation(
-                            data["name"], data["phone_number"], cid
-                        )
+                        build_delete_confirmation(ContactResponse.model_validate(data))
                     )
 
         return a2ui_messages or None

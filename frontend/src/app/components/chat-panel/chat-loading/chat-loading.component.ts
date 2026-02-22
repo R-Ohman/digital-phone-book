@@ -12,7 +12,6 @@ import { ProgressSpinner } from 'primeng/progressspinner';
   selector: 'app-chat-loading',
   imports: [ProgressSpinner],
   templateUrl: './chat-loading.component.html',
-  styleUrl: './chat-loading.component.scss',
   encapsulation: ViewEncapsulation.None,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
