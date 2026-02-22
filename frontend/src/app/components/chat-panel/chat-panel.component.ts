@@ -15,13 +15,17 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { ContactsApi } from '@api/contacts.api';
 import { LlmApi } from '@api/llm.api';
 import { ChatLoadingComponent } from '@components/chat-panel/chat-loading/chat-loading.component';
+import { ContactFormComponent } from '@components/contact-form/contact-form.component';
+import { Contact, ContactCreate } from '@models/contact';
 import { ChatHistoryMessage } from '@models/prompt';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
+import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { finalize } from 'rxjs/operators';
+import { MarkdownPipe } from '../../pipes/markdown.pipe';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -37,10 +41,13 @@ interface ChatMessage {
     InputTextModule,
     ButtonModule,
     ConfirmDialogModule,
+    DialogModule,
     ProgressSpinnerModule,
     FormsModule,
     Surface,
     ChatLoadingComponent,
+    ContactFormComponent,
+    MarkdownPipe,
   ],
   providers: [ConfirmationService],
   templateUrl: './chat-panel.component.html',
@@ -64,9 +71,13 @@ export class ChatPanelComponent {
   sending = signal<boolean>(false);
   streamingStarted = signal<boolean>(false);
   surfaces = signal<ReadonlyMap<string, any>>(new Map());
+  editDialogVisible = signal<boolean>(false);
+  editingContact = signal<Contact | null>(null);
+  editSaving = signal<boolean>(false);
 
   promptInput = this.#formBuilder.control<string>('', [Validators.maxLength(1024)]);
   readonly #contactSurfaceMap = new Map<string, string>();
+  #editSurfaceId = '';
 
   constructor() {
     effect(() => {
@@ -79,6 +90,7 @@ export class ChatPanelComponent {
 
     this.processor.events.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe((event) => {
       const userAction = (event.message as any)?.userAction;
+      debugger;
       if (userAction?.name === 'call') {
         const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
         if (phone) {
@@ -99,6 +111,7 @@ export class ChatPanelComponent {
           );
         }
       } else if (userAction?.name === 'delete') {
+        debugger;
         const id = (userAction.context?.['id'] as string | undefined) ?? '';
         const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
         const surfaceId = this.#contactSurfaceMap.get(id);
@@ -151,7 +164,7 @@ export class ChatPanelComponent {
         });
       } else if (userAction?.name === 'confirm-delete') {
         const id = (userAction.context?.['id'] as string | undefined) ?? '';
-        const name = (userAction.context?.['contactName'] as string | undefined) ?? 'this contact';
+        const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
         const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
         this.#contactsApi.delete(id).subscribe({
           next: () => {
@@ -195,8 +208,125 @@ export class ChatPanelComponent {
         }
         event.completion.next([]);
         event.completion.complete();
+      } else if (userAction?.name === 'edit') {
+        const id = (userAction.context?.['id'] as string | undefined) ?? '';
+        const name = (userAction.context?.['name'] as string | undefined) ?? '';
+        const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
+        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
+        this.#editSurfaceId = surfaceId;
+        this.editingContact.set({ id, name, phoneNumber: phone });
+        this.editDialogVisible.set(true);
+        event.completion.next([]);
+        event.completion.complete();
       }
     });
+  }
+
+  onEditSubmit(value: ContactCreate): void {
+    const contact = this.editingContact();
+    if (!contact || this.editSaving()) return;
+    this.editSaving.set(true);
+    this.#contactsApi
+      .update(contact.id, value)
+      .pipe(finalize(() => this.editSaving.set(false)))
+      .subscribe({
+        next: (updated) => {
+          this.#messageService.add({
+            severity: 'success',
+            summary: 'Saved',
+            detail: 'Contact updated',
+          });
+          this.editDialogVisible.set(false);
+          const surfaceId = this.#editSurfaceId;
+          if (surfaceId) {
+            this.processor.processMessages([
+              {
+                surfaceUpdate: {
+                  surfaceId,
+                  components: [
+                    {
+                      id: 'name-text',
+                      component: {
+                        Text: { text: { literalString: updated.name }, usageHint: 'h2' },
+                      },
+                    },
+                    {
+                      id: 'phone-text',
+                      component: { Text: { text: { literalString: updated.phoneNumber } } },
+                    },
+                    {
+                      id: 'call-btn',
+                      component: {
+                        Button: {
+                          child: 'call-btn-label',
+                          action: {
+                            name: 'call',
+                            context: [
+                              { key: 'phone', value: { literalString: updated.phoneNumber } },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                    {
+                      id: 'edit-btn',
+                      component: {
+                        Button: {
+                          child: 'edit-btn-label',
+                          action: {
+                            name: 'edit',
+                            context: [
+                              { key: 'id', value: { literalString: updated.id } },
+                              { key: 'name', value: { literalString: updated.name } },
+                              { key: 'phone', value: { literalString: updated.phoneNumber } },
+                              { key: 'surfaceId', value: { literalString: surfaceId } },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                    {
+                      id: 'delete-btn',
+                      component: {
+                        Button: {
+                          child: 'delete-btn-label',
+                          action: {
+                            name: 'delete',
+                            context: [
+                              { key: 'id', value: { literalString: updated.id } },
+                              { key: 'name', value: { literalString: updated.name } },
+                            ],
+                          },
+                        },
+                      },
+                    },
+                  ],
+                },
+              } as any,
+              {
+                dataModelUpdate: {
+                  surfaceId,
+                  contents: [
+                    { key: 'name', valueString: updated.name },
+                    { key: 'phone', valueString: updated.phoneNumber },
+                  ],
+                },
+              } as any,
+            ]);
+            this.surfaces.set(new Map(this.processor.getSurfaces()));
+            this.#contactSurfaceMap.set(updated.id, surfaceId);
+          }
+          this.refreshRequested.emit();
+        },
+        error: (err: unknown) => {
+          const detail = err instanceof Error ? err.message : 'Update failed';
+          this.#messageService.add({ severity: 'error', summary: 'Error', detail });
+        },
+      });
+  }
+
+  onEditCancel(): void {
+    if (!this.editSaving()) this.editDialogVisible.set(false);
   }
 
   send(): void {

@@ -113,7 +113,13 @@ def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
                         "id": "actions",
                         "component": {
                             "List": {
-                                "children": {"explicitList": ["call-btn", "delete-btn"]}
+                                "children": {
+                                    "explicitList": [
+                                        "call-btn",
+                                        "edit-btn",
+                                        "delete-btn",
+                                    ]
+                                }
                             }
                         },
                     },
@@ -133,6 +139,41 @@ def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
                                             "key": "phone",
                                             "value": {"literalString": phone},
                                         }
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                    {
+                        "id": "edit-btn-label",
+                        "component": {"Text": {"text": {"literalString": "Edit"}}},
+                    },
+                    {
+                        "id": "edit-btn",
+                        "component": {
+                            "Button": {
+                                "child": "edit-btn-label",
+                                "action": {
+                                    "name": "edit",
+                                    "context": [
+                                        {
+                                            "key": "id",
+                                            "value": {"literalString": contact_id},
+                                        },
+                                        {
+                                            "key": "name",
+                                            "value": {"literalString": name},
+                                        },
+                                        {
+                                            "key": "phone",
+                                            "value": {"literalString": phone},
+                                        },
+                                        {
+                                            "key": "surfaceId",
+                                            "value": {
+                                                "literalString": f"contact-card-{contact_id}"
+                                            },
+                                        },
                                     ],
                                 },
                             }
@@ -281,8 +322,8 @@ def _build_delete_confirmation_a2ui(name: str, phone: str, contact_id: str) -> L
                                             "value": {"literalString": contact_id},
                                         },
                                         {
-                                            "key": "contactName",
-                                            "value": {"path": "/contact/name"},
+                                            "key": "name",
+                                            "value": {"literalString": name},
                                         },
                                         {
                                             "key": "surfaceId",

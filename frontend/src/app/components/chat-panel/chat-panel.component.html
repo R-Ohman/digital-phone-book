@@ -1,4 +1,24 @@
 <p-confirmDialog />
+
+<p-dialog
+  (visibleChange)="editDialogVisible.set($event)"
+  [closable]="!editSaving()"
+  [closeOnEscape]="!editSaving()"
+  [draggable]="false"
+  header="Edit Contact"
+  [modal]="true"
+  [resizable]="false"
+  [style]="{ width: '32rem' }"
+  [visible]="editDialogVisible()"
+  ariaLabel="Edit contact dialog"
+>
+  <app-contact-form
+    [model]="editingContact() ?? undefined"
+    (submit)="onEditSubmit($event)"
+    (cancel)="onEditCancel()"
+  ></app-contact-form>
+</p-dialog>
+
 <div class="chat-panel">
   <div class="chat-panel__heading" id="chat-heading">
     <i class="pi pi-comments"></i>
@@ -11,9 +31,8 @@
         <div
           class="chat-panel__bubble"
           [attr.aria-label]="message.role === 'user' ? 'You' : 'Assistant'"
-        >
-          {{ message.text }}
-        </div>
+          [innerHTML]="message.text | markdown"
+        ></div>
       </div>
 
       <div class="chat-panel__surfaces">
