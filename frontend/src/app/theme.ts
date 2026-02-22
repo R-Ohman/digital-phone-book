@@ -187,7 +187,10 @@ export const theme: Theme = {
   additionalStyles: {
     Card: {
       'min-width': '320px',
-      background: '#666',
+      'border-color': '#999',
+    },
+    Column: {
+      gap: '1rem',
     },
     Button: {
       display: 'inline-flex',
@@ -196,7 +199,6 @@ export const theme: Theme = {
       cursor: 'pointer',
       'letter-spacing': '0.02em',
       transition: 'opacity 0.15s ease, transform 0.1s ease',
-      background: '#999',
     },
     List: {
       display: 'flex',
@@ -221,7 +223,7 @@ export const theme: Theme = {
       'layout-pl-7': true,
       'layout-pr-7': true,
       'border-br-16': true,
-      'border-bw-0': true,
+      'border-bw-1': true,
       'border-bs-s': true,
       'color-bgc-p30': true,
       'color-c-n100': true,
@@ -233,10 +235,10 @@ export const theme: Theme = {
       'color-bc-n90': true,
       'border-bw-1': true,
       'border-bs-s': true,
-      'layout-pt-10': true,
-      'layout-pb-10': true,
-      'layout-pl-4': true,
-      'layout-pr-4': true,
+      'layout-pt-6': true,
+      'layout-pb-6': true,
+      'layout-pl-5': true,
+      'layout-pr-5': true,
     },
     CheckBox: {
       element: {
@@ -283,8 +285,6 @@ export const theme: Theme = {
     },
     Divider: {
       'color-bgc-n90': true,
-      'layout-mt-6': true,
-      'layout-mb-6': true,
     },
     Image: {
       all: {

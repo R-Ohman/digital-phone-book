@@ -149,6 +149,52 @@ export class ChatPanelComponent {
             event.completion.complete();
           },
         });
+      } else if (userAction?.name === 'confirm-delete') {
+        const id = (userAction.context?.['id'] as string | undefined) ?? '';
+        const name = (userAction.context?.['contactName'] as string | undefined) ?? 'this contact';
+        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
+        this.#contactsApi.delete(id).subscribe({
+          next: () => {
+            this.#messageService.add({
+              severity: 'success',
+              summary: 'Deleted',
+              detail: `${name} deleted`,
+            });
+            if (surfaceId) {
+              this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
+              this.surfaces.set(new Map(this.processor.getSurfaces()));
+              this.messages.update((arr) =>
+                arr.map((msg) => ({
+                  ...msg,
+                  surfaceIds: msg.surfaceIds?.filter((sid) => sid !== surfaceId),
+                })),
+              );
+            }
+            event.completion.next([]);
+            event.completion.complete();
+            this.refreshRequested.emit();
+          },
+          error: (err: unknown) => {
+            const detail = err instanceof Error ? err.message : 'Delete failed';
+            this.#messageService.add({ severity: 'error', summary: 'Error', detail });
+            event.completion.next([]);
+            event.completion.complete();
+          },
+        });
+      } else if (userAction?.name === 'cancel-delete') {
+        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
+        if (surfaceId) {
+          this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
+          this.surfaces.set(new Map(this.processor.getSurfaces()));
+          this.messages.update((arr) =>
+            arr.map((msg) => ({
+              ...msg,
+              surfaceIds: msg.surfaceIds?.filter((sid) => sid !== surfaceId),
+            })),
+          );
+        }
+        event.completion.next([]);
+        event.completion.complete();
       }
     });
   }

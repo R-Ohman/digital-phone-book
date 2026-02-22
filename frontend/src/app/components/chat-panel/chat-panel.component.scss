@@ -75,12 +75,32 @@
     gap: $space-3;
     flex-wrap: wrap;
   }
-
-  button:has(a2ui-icon) {
-    padding: 0 !important;
-  }
 }
 
 a2ui-surface {
   display: block;
+
+  &[id^='delete-confirm-'] a2ui-button {
+    &:first-of-type button {
+      border-color: #a32d2d;
+      background-color: rgba(248, 23, 23, 30%);
+    }
+  }
+
+  &[id^='contact-card-'] a2ui-button {
+    button:has(a2ui-icon) {
+      border-width: 0;
+      padding: 0;
+    }
+
+    &:first-child button:not(:has(a2ui-icon)) {
+      background-color: #2aa276;
+      border-color: #34d399;
+    }
+
+    &:last-child button:not(:has(a2ui-icon)) {
+      border-color: #a32d2d;
+      background-color: rgba(248, 23, 23, 30%);
+    }
+  }
 }

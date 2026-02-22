@@ -184,6 +184,162 @@ def _build_contact_card_a2ui(name: str, phone: str, contact_id: str) -> List:
     ]
 
 
+def _build_delete_confirmation_a2ui(name: str, phone: str, contact_id: str) -> List:
+    """Return A2UI messages that render a delete confirmation card."""
+    surface_id = f"delete-confirm-{contact_id}"
+    return [
+        {
+            "surfaceUpdate": {
+                "surfaceId": surface_id,
+                "components": [
+                    {"id": "root", "component": {"Card": {"child": "contentColumn"}}},
+                    {
+                        "id": "contentColumn",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": [
+                                        "confirmationText",
+                                        "contactInfo",
+                                        "actionRow",
+                                    ]
+                                },
+                                "alignment": "center",
+                                "distribution": "spaceAround",
+                            }
+                        },
+                    },
+                    {
+                        "id": "confirmationText",
+                        "component": {
+                            "Text": {
+                                "text": {
+                                    "literalString": "Are you sure you want to delete this contact?"
+                                },
+                                "usageHint": "h3",
+                            }
+                        },
+                    },
+                    {
+                        "id": "contactInfo",
+                        "component": {
+                            "Column": {
+                                "children": {
+                                    "explicitList": ["contactName", "contactPhone"]
+                                },
+                                "alignment": "center",
+                            }
+                        },
+                    },
+                    {
+                        "id": "contactName",
+                        "component": {
+                            "Text": {
+                                "text": {"path": "/contact/name"},
+                                "usageHint": "h4",
+                            }
+                        },
+                    },
+                    {
+                        "id": "contactPhone",
+                        "component": {
+                            "Text": {
+                                "text": {"path": "/contact/phone_number"},
+                                "usageHint": "body",
+                            }
+                        },
+                    },
+                    {
+                        "id": "actionRow",
+                        "component": {
+                            "Row": {
+                                "children": {
+                                    "explicitList": [
+                                        "confirmDeleteButton",
+                                        "cancelDeleteButton",
+                                    ]
+                                },
+                                "distribution": "spaceEvenly",
+                                "alignment": "center",
+                            }
+                        },
+                    },
+                    {
+                        "id": "confirmDeleteText",
+                        "component": {"Text": {"text": {"literalString": "Confirm"}}},
+                    },
+                    {
+                        "id": "confirmDeleteButton",
+                        "component": {
+                            "Button": {
+                                "child": "confirmDeleteText",
+                                "action": {
+                                    "name": "confirm-delete",
+                                    "context": [
+                                        {
+                                            "key": "id",
+                                            "value": {"literalString": contact_id},
+                                        },
+                                        {
+                                            "key": "contactName",
+                                            "value": {"path": "/contact/name"},
+                                        },
+                                        {
+                                            "key": "surfaceId",
+                                            "value": {"literalString": surface_id},
+                                        },
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                    {
+                        "id": "cancelDeleteText",
+                        "component": {"Text": {"text": {"literalString": "Cancel"}}},
+                    },
+                    {
+                        "id": "cancelDeleteButton",
+                        "component": {
+                            "Button": {
+                                "child": "cancelDeleteText",
+                                "action": {
+                                    "name": "cancel-delete",
+                                    "context": [
+                                        {
+                                            "key": "surfaceId",
+                                            "value": {"literalString": surface_id},
+                                        }
+                                    ],
+                                },
+                            }
+                        },
+                    },
+                ],
+            }
+        },
+        {
+            "dataModelUpdate": {
+                "surfaceId": surface_id,
+                "contents": [
+                    {
+                        "key": "contact",
+                        "valueMap": [
+                            {"key": "name", "valueString": name},
+                            {"key": "phone_number", "valueString": phone},
+                        ],
+                    }
+                ],
+            }
+        },
+        {
+            "beginRendering": {
+                "surfaceId": surface_id,
+                "root": "root",
+            }
+        },
+    ]
+
+
 _BASE_SYSTEM_PROMPT = """You are a phone book assistant with access to tools for managing contacts.
 
 Think step by step:
@@ -194,6 +350,7 @@ Think step by step:
 - Execute every requested operation before writing your final answer.
 - IMPORTANT: To add a contact you need BOTH a name AND a phone number. If the user asks to create or add a contact but does not provide a phone number, do NOT call add_contact. Instead, ask the user to provide the phone number first, then add the contact once you have it.
 - If you require any other additional data to perform an action, ask the user to provide it before proceeding.
+- IMPORTANT: For delete requests, ONLY call propose_delete_contact. Do NOT call get_contact first. propose_delete_contact verifies the contact exists internally and shows the user a confirmation card if found. If the contact does not exist it returns not-found and you should tell the user. Never call get_contact before propose_delete_contact for a delete operation.
 - Be concise and conversational in your final response.
 """
 
@@ -244,23 +401,39 @@ class ToolCallAgent:
                 messages.append(AIMessage(content=content))
         return messages
 
-    async def execute(
-        self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
-    ) -> Tuple[str, Optional[List]]:
-        result = await self._executor.ainvoke(
-            {"input": user_prompt, "chat_history": self._build_chat_history(history)}
-        )
-        raw_output: str = result.get("output", "") or ""
+    @staticmethod
+    def _build_a2ui_from_steps(steps: List) -> Optional[List]:
+        """Convert intermediate agent steps into A2UI messages.
 
+        Uses a two-pass approach: first collect IDs that will have a
+        confirmation card, then skip regular contact cards for those IDs.
+        """
+        # Pass 1: collect IDs that get a delete confirmation card.
+        confirm_ids: set = set()
+        for action, observation in steps:
+            if getattr(action, "tool", None) == "propose_delete_contact":
+                try:
+                    data = json.loads(observation)
+                    if data.get("proposed"):
+                        confirm_ids.add(data["id"])
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+        # Pass 2: build messages, skipping regular cards for confirmed-delete IDs.
         a2ui_messages: List = []
-        seen_contact_ids: set = set()
-        for action, observation in result.get("intermediate_steps", []):
+        seen_ids: set = set()
+        seen_confirm_ids: set = set()
+        for action, observation in steps:
             tool = getattr(action, "tool", None)
             if tool == "get_contact":
                 try:
                     data = json.loads(observation)
-                    if data.get("found") and data["id"] not in seen_contact_ids:
-                        seen_contact_ids.add(data["id"])
+                    if (
+                        data.get("found")
+                        and data["id"] not in seen_ids
+                        and data["id"] not in confirm_ids
+                    ):
+                        seen_ids.add(data["id"])
                         a2ui_messages.extend(
                             _build_contact_card_a2ui(
                                 data["name"], data["phone_number"], data["id"]
@@ -271,8 +444,8 @@ class ToolCallAgent:
             elif tool in ("add_contact", "update_contact"):
                 try:
                     data = json.loads(observation)
-                    if data.get("success") and data["id"] not in seen_contact_ids:
-                        seen_contact_ids.add(data["id"])
+                    if data.get("success") and data["id"] not in seen_ids:
+                        seen_ids.add(data["id"])
                         a2ui_messages.extend(
                             _build_contact_card_a2ui(
                                 data["name"], data["phone_number"], data["id"]
@@ -280,15 +453,40 @@ class ToolCallAgent:
                         )
                 except (json.JSONDecodeError, KeyError):
                     pass
+            elif tool == "propose_delete_contact":
+                try:
+                    data = json.loads(observation)
+                    if data.get("proposed") and data["id"] not in seen_confirm_ids:
+                        seen_confirm_ids.add(data["id"])
+                        a2ui_messages.extend(
+                            _build_delete_confirmation_a2ui(
+                                data["name"], data["phone_number"], data["id"]
+                            )
+                        )
+                except (json.JSONDecodeError, KeyError):
+                    pass
 
-        return raw_output.strip(), a2ui_messages if a2ui_messages else None
+        return a2ui_messages if a2ui_messages else None
+
+    async def execute(
+        self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
+    ) -> Tuple[str, Optional[List]]:
+        result = await self._executor.ainvoke(
+            {"input": user_prompt, "chat_history": self._build_chat_history(history)}
+        )
+        raw_output: str = result.get("output", "") or ""
+        a2ui_messages = self._build_a2ui_from_steps(
+            result.get("intermediate_steps", [])
+        )
+        return raw_output.strip(), a2ui_messages
 
     async def execute_stream(
         self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Stream the agent response token-by-token, then emit A2UI messages."""
-        seen_contact_ids: set = set()
-        a2ui_messages: List = []
+        # Collect tool results for post-processing (same two-pass logic as execute).
+        tool_results: List[Tuple[str, str]] = []
+        # run_ids where the LLM issued tool calls (tokens from these runs are suppressed)
         tool_calling_runs: set = set()
 
         async for event in self._executor.astream_events(
@@ -314,35 +512,17 @@ class ToolCallAgent:
             elif event_name == "on_tool_end":
                 tool_name = event.get("name", "")
                 output = event.get("data", {}).get("output", "")
-                if isinstance(output, str):
-                    if tool_name == "get_contact":
-                        try:
-                            data = json.loads(output)
-                            if data.get("found") and data["id"] not in seen_contact_ids:
-                                seen_contact_ids.add(data["id"])
-                                a2ui_messages.extend(
-                                    _build_contact_card_a2ui(
-                                        data["name"], data["phone_number"], data["id"]
-                                    )
-                                )
-                        except (json.JSONDecodeError, KeyError):
-                            pass
-                    elif tool_name in ("add_contact", "update_contact"):
-                        try:
-                            data = json.loads(output)
-                            if (
-                                data.get("success")
-                                and data["id"] not in seen_contact_ids
-                            ):
-                                seen_contact_ids.add(data["id"])
-                                a2ui_messages.extend(
-                                    _build_contact_card_a2ui(
-                                        data["name"], data["phone_number"], data["id"]
-                                    )
-                                )
-                        except (json.JSONDecodeError, KeyError):
-                            pass
+                if isinstance(output, str) and tool_name:
+                    tool_results.append((tool_name, output))
 
+        # Build a2ui using the same two-pass logic as execute.
+        # Wrap results in fake action objects compatible with _build_a2ui_from_steps.
+        class _FakeAction:
+            def __init__(self, tool: str):
+                self.tool = tool
+
+        steps = [(_FakeAction(name), obs) for name, obs in tool_results]
+        a2ui_messages = self._build_a2ui_from_steps(steps)
         if a2ui_messages:
             yield {"type": "a2ui", "messages": a2ui_messages}
         yield {"type": "done"}
@@ -392,11 +572,20 @@ class ToolCallAgent:
             except Exception as exc:
                 return json.dumps({"success": False, "error": str(exc)})
 
-        async def delete_contact(name: str) -> str:
+        async def propose_delete_contact(name: str) -> str:
             async with self._session_factory() as session:
                 svc = self._make_service(session)
-                deleted = await svc.delete_by_name(name)
-            return json.dumps({"success": deleted, "name": name})
+                contact = await svc.get_by_name(name)
+            if not contact:
+                return json.dumps({"found": False, "name": name})
+            return json.dumps(
+                {
+                    "proposed": True,
+                    "id": str(contact.id),
+                    "name": contact.name,
+                    "phone_number": contact.phone_number,
+                }
+            )
 
         async def update_contact(
             name: Optional[str] = None,
@@ -448,9 +637,9 @@ class ToolCallAgent:
                 args_schema=AddContactInput,
             ),
             StructuredTool.from_function(
-                coroutine=delete_contact,
-                name="delete_contact",
-                description="Delete a contact from the phone book by name.",
+                coroutine=propose_delete_contact,
+                name="propose_delete_contact",
+                description="Propose deleting a contact. Verifies the contact exists by name first. If found, shows the user a confirmation card — does NOT delete immediately. If not found, returns not-found. Use this as the sole tool for any delete request; do not call get_contact beforehand.",
                 args_schema=DeleteContactInput,
             ),
             StructuredTool.from_function(

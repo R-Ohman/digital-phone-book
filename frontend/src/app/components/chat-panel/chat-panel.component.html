@@ -20,7 +20,7 @@
         @for (surfaceId of message.surfaceIds ?? []; track surfaceId) {
           @if (surfaces().get(surfaceId); as surface) {
             <div class="chat-panel__message chat-panel__message--assistant">
-              <a2ui-surface [surfaceId]="surfaceId" [surface]="surface" />
+              <a2ui-surface [id]="surfaceId" [surfaceId]="surfaceId" [surface]="surface" />
             </div>
           }
         }
