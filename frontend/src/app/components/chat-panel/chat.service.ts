@@ -198,10 +198,8 @@ export class ChatService {
     }
 
     if (userAction?.name === 'close') {
-      const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-      if (surfaceId) this.#removeSurface(surfaceId);
+      this.#removeSurface(userAction.surfaceId);
       event.completion.next([]);
-      event.completion.complete();
       return;
     }
 
@@ -216,10 +214,8 @@ export class ChatService {
     }
 
     if (userAction?.name === 'cancel-delete') {
-      const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-      if (surfaceId) this.#removeSurface(surfaceId);
+      this.#removeSurface(userAction.surfaceId);
       event.completion.next([]);
-      event.completion.complete();
       return;
     }
 
@@ -227,12 +223,10 @@ export class ChatService {
       const id = (userAction.context?.['id'] as string | undefined) ?? '';
       const name = (userAction.context?.['name'] as string | undefined) ?? '';
       const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
-      const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-      this.#editSurfaceId = surfaceId;
+      this.#editSurfaceId = userAction.surfaceId;
       this.editingContact.set({ id, name, phoneNumber: phone });
       this.editDialogVisible.set(true);
       event.completion.next([]);
-      event.completion.complete();
     }
   }
 
@@ -300,7 +294,7 @@ export class ChatService {
     const surfaceMessages: Types.ServerToClientMessage[] = [];
 
     for (const [surfaceId] of allSurfaces) {
-      if (surfaceId.startsWith('contact-card-') && surfaceId.endsWith(contact.id)) {
+      if (surfaceId.endsWith(contact.id)) {
         surfaceMessages.push({
           dataModelUpdate: {
             surfaceId,

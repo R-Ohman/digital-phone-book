@@ -34,7 +34,6 @@ def build_contact_card(contact: ContactResponse) -> list:
             {"key": "name", "valueString": contact.name},
             {"key": "phone", "valueString": contact.phone_number},
             {"key": "id", "valueString": str(contact.id)},
-            {"key": "surfaceId", "valueString": surface_id},
         ],
     )
 

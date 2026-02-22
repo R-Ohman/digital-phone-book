@@ -2,18 +2,32 @@ import json
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
-from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.config import settings
 from src.contacts.schemas import ContactResponse
-from .prompt_builder import PROMPT
 from .tools import build_tools
 from .ui_builder import build_contact_card, build_delete_confirmation
 
 logger = logging.getLogger(__name__)
+
+# Tools whose output requires LLM reasoning instead of a hardcoded reply
+_REASONING_TOOLS = {"get_all_contacts"}
+_REASONING_SYSTEM = "Answer the user's question concisely and directly based only on the provided contact data."
+
+SYSTEM_PROMPT = """You are a phone-book assistant. Use tools to manage contacts.
+
+Rules:
+- When looking up one or more specific named contacts, call get_contact once per name. Never use get_all_contacts for named lookups.
+- Only use get_all_contacts when the user asks for the full list, all contacts, or wants to filter/search without specifying exact names.
+- Adding a contact requires BOTH a name AND a phone number. If the phone number is missing, ask for it first — do NOT call add_contact.
+- For delete requests, call propose_delete_contact directly. Never call get_contact before it.
+- For conditional requests (e.g. "if X exists update them"), call get_contact first, then decide.
+- Complete all requested operations before replying.
+- Be concise.
+"""
 
 
 class ToolCallAgent:
@@ -25,157 +39,191 @@ class ToolCallAgent:
         self._llm = ChatOllama(
             model=model or settings.llm_model,
             temperature=0.0,
-            num_predict=4096,
+            num_predict=256,
             base_url=settings.llm_url,
         )
-        tools = build_tools(session_factory)
-        agent = create_tool_calling_agent(self._llm, tools, PROMPT)
-        self._executor = AgentExecutor(
-            agent=agent,
-            tools=tools,
-            handle_parsing_errors=True,
-            return_intermediate_steps=True,
-        )
+        self._tools = build_tools(session_factory)
+        self._tool_map = {t.name: t for t in self._tools}
+        self._llm_with_tools = self._llm.bind_tools(self._tools)
 
     async def execute_stream(
-        self, user_prompt: str, history: Optional[List[Dict[str, str]]] = None
+        self, user_prompt: str
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream tokens, then emit A2UI surface messages and a done signal."""
-        tool_results: List[Tuple[str, str]] = []
-        tool_calling_runs: set = set()
-        announced_tool_calls: set = set()  # run_id+tool pairs already logged
+        messages = self._build_messages(user_prompt)
+        logger.info("> Processing | prompt: %s", user_prompt)
 
-        logger.info("▶ Processing started | prompt: %s", user_prompt)
+        accumulated: Optional[Any] = None
+        is_tool_calling = False
+        streamed_text = False
 
-        async for event in self._executor.astream_events(
-            {"input": user_prompt, "chat_history": self._build_chat_history(history)},
-            version="v2",
-        ):
-            event_name = event.get("event")
-            run_id = event.get("run_id")
+        async for chunk in self._llm_with_tools.astream(messages):
+            if getattr(chunk, "tool_call_chunks", None):
+                is_tool_calling = True
 
-            if event_name == "on_chat_model_start":
-                logger.info("  LLM thinking...")
+            content = getattr(chunk, "content", "")
+            if not is_tool_calling and isinstance(content, str) and content:
+                streamed_text = True
+                yield {"type": "token", "text": content}
 
-            elif event_name == "on_chat_model_end":
-                usage = event.get("data", {}).get("output", {})
-                try:
-                    counts = usage.usage_metadata  # type: ignore[union-attr]
-                    logger.info(
-                        "  LLM finished | in=%s out=%s total=%s tokens",
-                        counts.get("input_tokens", "?"),
-                        counts.get("output_tokens", "?"),
-                        counts.get("total_tokens", "?"),
-                    )
-                except Exception:
-                    logger.info("  LLM finished")
+            accumulated = chunk if accumulated is None else accumulated + chunk
 
-            elif event_name == "on_tool_start":
-                tool_name = event.get("name", "")
-                input_data = event.get("data", {}).get("input", "")
-                logger.info("[TOOL START] %s | Input: %s", tool_name, input_data)
+        try:
+            usage = accumulated.usage_metadata or {}
+            logger.info(
+                "LLM usage | in=%s out=%s total=%s tokens",
+                usage.get("input_tokens", "?"),
+                usage.get("output_tokens", "?"),
+                usage.get("total_tokens", "?"),
+            )
+        except Exception:
+            pass
 
-            elif event_name == "on_tool_end":
-                tool_name = event.get("name", "")
-                output = event.get("data", {}).get("output", "")
-                logger.info("[TOOL END] %s | Output: %s", tool_name, output)
-                if isinstance(output, str) and tool_name:
-                    tool_results.append((tool_name, output))
+        tool_calls = getattr(accumulated, "tool_calls", []) or []
 
-            elif event_name == "on_chat_model_stream":
-                chunk = event.get("data", {}).get("chunk")
-                if chunk is not None:
-                    tool_chunks = getattr(chunk, "tool_call_chunks", None)
-                    if tool_chunks:
-                        tool_calling_runs.add(run_id)
-                        for tc in tool_chunks:
-                            tc_name = tc.get("name") or ""
-                            key = f"{run_id}:{tc_name}"
-                            if tc_name and key not in announced_tool_calls:
-                                announced_tool_calls.add(key)
-                                logger.info("  LLM requesting tool: %s", tc_name)
-                    content = getattr(chunk, "content", "")
-                    if (
-                        isinstance(content, str)
-                        and content
-                        and run_id not in tool_calling_runs
-                    ):
-                        yield {"type": "token", "text": content}
+        if tool_calls:
+            tool_results = await self._run_tools(tool_calls)
+            needs_reasoning = any(name in _REASONING_TOOLS for name, _ in tool_results)
 
-        logger.info("■ Processing finished")
-        a2ui = self._build_a2ui_from_steps(self._wrap_steps(tool_results))
-        if a2ui:
-            yield {"type": "a2ui", "messages": a2ui}
+            if needs_reasoning:
+                async for event in self._stream_reasoning_response(
+                    user_prompt, tool_results
+                ):
+                    yield event
+            else:
+                response_text = self._build_response_text(tool_results)
+                if response_text:
+                    yield {"type": "token", "text": response_text}
+
+            a2ui = self._build_a2ui_from_steps(tool_results)
+            if a2ui:
+                yield {"type": "a2ui", "messages": a2ui}
+
+        elif not streamed_text:
+            fallback = getattr(accumulated, "content", "") or ""
+            if fallback:
+                yield {"type": "token", "text": fallback}
+
         yield {"type": "done"}
 
+    async def _run_tools(self, tool_calls: list) -> List[Tuple[str, str]]:
+        """Invoke each requested tool and return (tool_name, json_output) pairs."""
+        results: List[Tuple[str, str]] = []
+
+        for tool_call in tool_calls:
+            tool_name = tool_call["name"]
+            tool_args = tool_call["args"]
+            tool_fn = self._tool_map.get(tool_name)
+
+            if tool_fn is None:
+                logger.warning("[TOOL] unknown tool: %s", tool_name)
+                continue
+
+            logger.info("[TOOL] %s | args: %s", tool_name, tool_args)
+            output = await tool_fn.ainvoke(tool_args)
+
+            if not isinstance(output, str):
+                output = json.dumps(output)
+
+            logger.info("[TOOL] %s | result: %s", tool_name, output)
+            results.append((tool_name, output))
+
+        return results
+
+    async def _stream_reasoning_response(
+        self, user_prompt: str, tool_results: List[Tuple[str, str]]
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        data_payload = json.dumps(
+            {name: json.loads(output) for name, output in tool_results},
+            ensure_ascii=False,
+        )
+        messages = [
+            SystemMessage(content=_REASONING_SYSTEM),
+            HumanMessage(
+                content=f"Question: {user_prompt}\n\nContact data: {data_payload}"
+            ),
+        ]
+        async for chunk in self._llm.astream(messages):
+            content = getattr(chunk, "content", "")
+            if isinstance(content, str) and content:
+                yield {"type": "token", "text": content}
+
     @staticmethod
-    def _build_chat_history(history: Optional[List[Dict[str, str]]]) -> list:
-        mapping = {"user": HumanMessage, "assistant": AIMessage}
+    def _build_messages(user_prompt: str) -> list:
         return [
-            mapping[msg["role"]](content=msg.get("content", ""))
-            for msg in (history or [])
-            if msg.get("role") in mapping
+            SystemMessage(content=SYSTEM_PROMPT),
+            HumanMessage(content=user_prompt),
         ]
 
     @staticmethod
-    def _wrap_steps(tool_results: List[Tuple[str, str]]) -> List:
-        """Wrap (tool_name, output) pairs into objects compatible with _build_a2ui_from_steps."""
+    def _build_response_text(tool_results: List[Tuple[str, str]]) -> str:
+        parts: List[str] = []
 
-        class _Step:
-            def __init__(self, tool: str):
-                self.tool = tool
-
-        return [(_Step(name), obs) for name, obs in tool_results]
-
-    @staticmethod
-    def _build_a2ui_from_steps(steps: List) -> Optional[List]:
-        """Convert intermediate agent steps into A2UI surface messages.
-
-        Two-pass approach:
-          1. Collect contact IDs that will receive a delete-confirmation card.
-          2. Build UI messages, skipping regular contact cards for those IDs.
-        """
-        confirm_ids: set = set()
-        for action, observation in steps:
-            if getattr(action, "tool", None) == "propose_delete_contact":
-                try:
-                    data = json.loads(observation)
-                    if data.get("proposed"):
-                        confirm_ids.add(data["id"])
-                except (json.JSONDecodeError, KeyError):
-                    pass
-
-        a2ui_messages: List = []
-        seen_ids: set = set()
-        seen_confirm_ids: set = set()
-
-        for action, observation in steps:
-            tool = getattr(action, "tool", None)
+        for tool_name, output in tool_results:
             try:
-                data = json.loads(observation)
+                data = json.loads(output)
             except (json.JSONDecodeError, TypeError):
                 continue
 
-            if tool == "get_contact":
-                cid = data.get("id")
-                if data.get("found") and cid not in seen_ids and cid not in confirm_ids:
-                    seen_ids.add(cid)
+            if tool_name == "get_contact":
+                if data.get("success"):
+                    parts.append(f"Found **{data['name']}**: {data['phone_number']}")
+                else:
+                    parts.append(f"No contact named **{data['name']}** was found.")
+
+            elif tool_name == "add_contact":
+                if data.get("success"):
+                    parts.append(
+                        f"Added **{data['name']}** ({data['phone_number']}) to your contacts."
+                    )
+                else:
+                    parts.append(
+                        f"Failed to add contact: {data.get('error', 'unknown error')}"
+                    )
+
+            elif tool_name == "update_contact":
+                if data.get("success"):
+                    parts.append(
+                        f"Updated contact: **{data['name']}** - {data['phone_number']}."
+                    )
+                else:
+                    parts.append(
+                        f"Could not update contact: {data.get('error', 'unknown error')}"
+                    )
+
+            elif tool_name == "propose_delete_contact":
+                if data.get("proposed"):
+                    parts.append(
+                        f"Found **{data['name']}**. Please confirm the deletion using the card below."
+                    )
+                else:
+                    parts.append(f"No contact named **{data['name']}** was found.")
+
+        return "\n\n".join(parts)
+
+    @staticmethod
+    def _build_a2ui_from_steps(tool_results: List[Tuple[str, str]]) -> Optional[List]:
+        a2ui_messages: List = []
+        contact_card_ids: set = set()
+        delete_confirmation_ids: set = set()
+
+        for tool_name, output in tool_results:
+            try:
+                data = json.loads(output)
+            except (json.JSONDecodeError, TypeError):
+                continue
+
+            contact_id = data.get("id")
+
+            if tool_name in ("get_contact", "add_contact", "update_contact"):
+                if data.get("success") and contact_id not in contact_card_ids:
+                    contact_card_ids.add(contact_id)
                     a2ui_messages.extend(
                         build_contact_card(ContactResponse.model_validate(data))
                     )
 
-            elif tool in ("add_contact", "update_contact"):
-                cid = data.get("id")
-                if data.get("success") and cid not in seen_ids:
-                    seen_ids.add(cid)
-                    a2ui_messages.extend(
-                        build_contact_card(ContactResponse.model_validate(data))
-                    )
-
-            elif tool == "propose_delete_contact":
-                cid = data.get("id")
-                if data.get("proposed") and cid not in seen_confirm_ids:
-                    seen_confirm_ids.add(cid)
+            elif tool_name == "propose_delete_contact":
+                if data.get("proposed") and contact_id not in delete_confirmation_ids:
+                    delete_confirmation_ids.add(contact_id)
                     a2ui_messages.extend(
                         build_delete_confirmation(ContactResponse.model_validate(data))
                     )

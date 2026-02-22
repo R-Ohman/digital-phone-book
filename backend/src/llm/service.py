@@ -13,11 +13,6 @@ class LLMService:
     async def stream_user_prompt(
         self, user_prompt: UserPrompt
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        history = (
-            [m.model_dump() for m in user_prompt.history]
-            if user_prompt.history
-            else None
-        )
         agent = ToolCallAgent(session_factory=self._session_factory)
-        async for chunk in agent.execute_stream(user_prompt.prompt, history=history):
+        async for chunk in agent.execute_stream(user_prompt.prompt):
             yield chunk

@@ -20,7 +20,9 @@
           "id": "confirmationText",
           "component": {
             "Text": {
-              "text": { "literalString": "Are you sure you want to delete this contact?" },
+              "text": {
+                "literalString": "Are you sure you want to delete this contact?"
+              },
               "usageHint": "h3"
             }
           }
@@ -70,9 +72,8 @@
               "action": {
                 "name": "confirm-delete",
                 "context": [
-                  { "key": "id",        "value": { "path": "id" } },
-                  { "key": "name",      "value": { "path": "name" } },
-                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
+                  { "key": "id", "value": { "path": "id" } },
+                  { "key": "name", "value": { "path": "name" } }
                 ]
               }
             }
@@ -89,9 +90,7 @@
               "child": "cancelDeleteText",
               "action": {
                 "name": "cancel-delete",
-                "context": [
-                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
-                ]
+                "context": []
               }
             }
           }
@@ -103,10 +102,9 @@
     "dataModelUpdate": {
       "surfaceId": "",
       "contents": [
-        { "key": "name",      "valueString": "" },
-        { "key": "phone",     "valueString": "" },
-        { "key": "id",        "valueString": "" },
-        { "key": "surfaceId", "valueString": "" }
+        { "key": "name", "valueString": "" },
+        { "key": "phone", "valueString": "" },
+        { "key": "id", "valueString": "" }
       ]
     }
   },

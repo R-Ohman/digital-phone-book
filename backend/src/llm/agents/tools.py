@@ -31,13 +31,13 @@ def build_tools(
         if contact:
             return json.dumps(
                 {
-                    "found": True,
+                    "success": True,
                     "id": str(contact.id),
                     "name": contact.name,
                     "phone_number": contact.phone_number,
                 }
             )
-        return json.dumps({"found": False, "name": name})
+        return json.dumps({"success": False, "name": name})
 
     async def get_all_contacts() -> str:
         async with session_factory() as session:
@@ -116,7 +116,10 @@ def build_tools(
         StructuredTool.from_function(
             coroutine=get_all_contacts,
             name="get_all_contacts",
-            description="Retrieve all contacts in the phone book.",
+            description=(
+                "Retrieve every contact in the phone book. "
+                "Use ONLY when the user wants the full list or needs to filter without knowing exact names. "
+            ),
             args_schema=GetAllContactsInput,
         ),
         StructuredTool.from_function(

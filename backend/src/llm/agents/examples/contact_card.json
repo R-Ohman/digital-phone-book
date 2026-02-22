@@ -46,9 +46,7 @@
               "child": "close-btn-icon",
               "action": {
                 "name": "close",
-                "context": [
-                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
-                ]
+                "context": []
               }
             }
           }
@@ -91,9 +89,7 @@
               "child": "call-btn-label",
               "action": {
                 "name": "call",
-                "context": [
-                  { "key": "phone", "value": { "path": "phone" } }
-                ]
+                "context": [{ "key": "phone", "value": { "path": "phone" } }]
               }
             }
           }
@@ -110,10 +106,9 @@
               "action": {
                 "name": "edit",
                 "context": [
-                  { "key": "id",        "value": { "path": "id" } },
-                  { "key": "name",      "value": { "path": "name" } },
-                  { "key": "phone",     "value": { "path": "phone" } },
-                  { "key": "surfaceId", "value": { "path": "surfaceId" } }
+                  { "key": "id", "value": { "path": "id" } },
+                  { "key": "name", "value": { "path": "name" } },
+                  { "key": "phone", "value": { "path": "phone" } }
                 ]
               }
             }
@@ -131,7 +126,7 @@
               "action": {
                 "name": "delete",
                 "context": [
-                  { "key": "id",   "value": { "path": "id" } },
+                  { "key": "id", "value": { "path": "id" } },
                   { "key": "name", "value": { "path": "name" } }
                 ]
               }
@@ -145,10 +140,9 @@
     "dataModelUpdate": {
       "surfaceId": "",
       "contents": [
-        { "key": "name",      "valueString": "" },
-        { "key": "phone",     "valueString": "" },
-        { "key": "id",        "valueString": "" },
-        { "key": "surfaceId", "valueString": "" }
+        { "key": "name", "valueString": "" },
+        { "key": "phone", "valueString": "" },
+        { "key": "id", "valueString": "" }
       ]
     }
   },
