@@ -27,17 +27,33 @@ def build_tools(
 ) -> List[StructuredTool]:
     async def get_contact(name: str) -> str:
         async with session_factory() as session:
-            contact = await _make_service(session).get_by_name(name)
-        if contact:
+            contacts = await _make_service(session).get_by_name(name)
+        if not contacts:
+            return json.dumps({"success": False, "name": name})
+        if len(contacts) > 1:
             return json.dumps(
                 {
                     "success": True,
-                    "id": str(contact.id),
-                    "name": contact.name,
-                    "phone_number": contact.phone_number,
+                    "multiple_found": True,
+                    "contacts": [
+                        {
+                            "id": str(c.id),
+                            "name": c.name,
+                            "phone_number": c.phone_number,
+                        }
+                        for c in contacts
+                    ],
                 }
             )
-        return json.dumps({"success": False, "name": name})
+        contact = contacts[0]
+        return json.dumps(
+            {
+                "success": True,
+                "id": str(contact.id),
+                "name": contact.name,
+                "phone_number": contact.phone_number,
+            }
+        )
 
     async def get_all_contacts() -> str:
         async with session_factory() as session:
@@ -65,9 +81,24 @@ def build_tools(
 
     async def propose_delete_contact(name: str) -> str:
         async with session_factory() as session:
-            contact = await _make_service(session).get_by_name(name)
-        if not contact:
-            return json.dumps({"found": False, "name": name})
+            contacts = await _make_service(session).get_by_name(name)
+        if not contacts:
+            return json.dumps({"success": False, "name": name})
+        if len(contacts) > 1:
+            return json.dumps(
+                {
+                    "multiple_found": True,
+                    "contacts": [
+                        {
+                            "id": str(c.id),
+                            "name": c.name,
+                            "phone_number": c.phone_number,
+                        }
+                        for c in contacts
+                    ],
+                }
+            )
+        contact = contacts[0]
         return json.dumps(
             {
                 "proposed": True,
@@ -90,8 +121,31 @@ def build_tools(
                 }
             )
         async with session_factory() as session:
-            contact = await _make_service(session).update_by_name(
-                name, ContactUpdate(name=new_name, phone_number=new_phone_number)
+            svc = _make_service(session)
+            contacts = await svc.get_by_name(name)
+            if not contacts:
+                return json.dumps(
+                    {"success": False, "error": f"Contact '{name}' not found"}
+                )
+            if len(contacts) > 1:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "multiple_found": True,
+                        "contacts": [
+                            {
+                                "id": str(c.id),
+                                "name": c.name,
+                                "phone_number": c.phone_number,
+                            }
+                            for c in contacts
+                        ],
+                        "error": f"Multiple contacts found for '{name}'. Ask the user to clarify which one to update.",
+                    }
+                )
+            contact = await svc.update(
+                contacts[0].id,
+                ContactUpdate(name=new_name, phone_number=new_phone_number),
             )
         if not contact:
             return json.dumps(

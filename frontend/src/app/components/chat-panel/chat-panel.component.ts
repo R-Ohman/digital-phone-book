@@ -4,8 +4,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
+  effect,
+  ElementRef,
   inject,
   output,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -52,8 +55,27 @@ export class ChatPanelComponent {
   refreshRequested = output<void>();
 
   promptInput = this.#formBuilder.control<string>('', [Validators.maxLength(1024)]);
+  messagesContainer = viewChild.required<ElementRef>('messagesContainer');
 
   constructor() {
+    effect(() => {
+      this.chat.messages();
+
+      const el = this.messagesContainer()?.nativeElement;
+      if (!el) return;
+
+      const shouldScroll = this.#isNearBottom(el);
+
+      setTimeout(() => {
+        if (shouldScroll) {
+          el.scrollTo({
+            top: el.scrollHeight,
+            behavior: 'smooth',
+          });
+        }
+      }, 50);
+    });
+
     this.chat.refreshRequested$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.refreshRequested.emit());
@@ -73,5 +95,10 @@ export class ChatPanelComponent {
 
   onContactEdited(contact: Contact): void {
     this.chat.updateContactInSurfaces(contact);
+  }
+
+  #isNearBottom(el: HTMLElement): boolean {
+    const threshold = 200;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   }
 }

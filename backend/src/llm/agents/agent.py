@@ -165,7 +165,12 @@ class ToolCallAgent:
                 continue
 
             if tool_name == "get_contact":
-                if data.get("success"):
+                if data.get("multiple_found"):
+                    lines = ["Multiple contacts found:"]
+                    for c in data["contacts"]:
+                        lines.append(f"- **{c['name']}**: {c['phone_number']}")
+                    parts.append("\n".join(lines))
+                elif data.get("success"):
                     parts.append(f"Found **{data['name']}**: {data['phone_number']}")
                 else:
                     parts.append(f"No contact named **{data['name']}** was found.")
@@ -181,7 +186,15 @@ class ToolCallAgent:
                     )
 
             elif tool_name == "update_contact":
-                if data.get("success"):
+                if data.get("multiple_found"):
+                    lines = ["Multiple contacts with that name were found:"]
+                    for c in data["contacts"]:
+                        lines.append(f"- **{c['name']}**: {c['phone_number']}")
+                    lines.append(
+                        "\nYou can change the contact manually using a card below."
+                    )
+                    parts.append("\n".join(lines))
+                elif data.get("success"):
                     parts.append(
                         f"Updated contact: **{data['name']}** - {data['phone_number']}."
                     )
@@ -191,7 +204,13 @@ class ToolCallAgent:
                     )
 
             elif tool_name == "propose_delete_contact":
-                if data.get("proposed"):
+                if data.get("multiple_found"):
+                    lines = ["Multiple contacts with that name were found:"]
+                    for c in data["contacts"]:
+                        lines.append(f"- **{c['name']}**: {c['phone_number']}")
+                    lines.append("\nPlease specify which contact you want to delete.")
+                    parts.append("\n".join(lines))
+                elif data.get("proposed"):
                     parts.append(
                         f"Found **{data['name']}**. Please confirm the deletion using the card below."
                     )
@@ -215,14 +234,28 @@ class ToolCallAgent:
             contact_id = data.get("id")
 
             if tool_name in ("get_contact", "add_contact", "update_contact"):
-                if data.get("success") and contact_id not in contact_card_ids:
+                if data.get("multiple_found") and tool_name == "update_contact":
+                    for c in data["contacts"]:
+                        if c["id"] not in contact_card_ids:
+                            contact_card_ids.add(c["id"])
+                            a2ui_messages.extend(
+                                build_contact_card(ContactResponse.model_validate(c))
+                            )
+                elif data.get("success") and contact_id not in contact_card_ids:
                     contact_card_ids.add(contact_id)
                     a2ui_messages.extend(
                         build_contact_card(ContactResponse.model_validate(data))
                     )
 
             elif tool_name == "propose_delete_contact":
-                if data.get("proposed") and contact_id not in delete_confirmation_ids:
+                if data.get("multiple_found"):
+                    for c in data["contacts"]:
+                        if c["id"] not in contact_card_ids:
+                            contact_card_ids.add(c["id"])
+                            a2ui_messages.extend(
+                                build_contact_card(ContactResponse.model_validate(c))
+                            )
+                elif data.get("proposed") and contact_id not in delete_confirmation_ids:
                     delete_confirmation_ids.add(contact_id)
                     a2ui_messages.extend(
                         build_delete_confirmation(ContactResponse.model_validate(data))
