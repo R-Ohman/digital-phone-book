@@ -14,8 +14,3 @@ class UserPrompt(CamelCaseModel):
 
     prompt: str = Field(max_length=1024)
     history: Optional[List[ChatHistoryMessage]] = None
-
-
-class LLMResponse(CamelCaseModel):
-    message: str
-    a2ui_messages: Optional[List[Any]] = None

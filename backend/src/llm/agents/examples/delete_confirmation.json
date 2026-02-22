@@ -1,0 +1,136 @@
+[
+  {
+    "surfaceUpdate": {
+      "surfaceId": "__SURFACE_ID__",
+      "components": [
+        { "id": "root", "component": { "Card": { "child": "contentColumn" } } },
+        {
+          "id": "contentColumn",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": ["confirmationText", "contactInfo", "actionRow"]
+              },
+              "alignment": "center",
+              "distribution": "spaceAround"
+            }
+          }
+        },
+        {
+          "id": "confirmationText",
+          "component": {
+            "Text": {
+              "text": {
+                "literalString": "Are you sure you want to delete this contact?"
+              },
+              "usageHint": "h3"
+            }
+          }
+        },
+        {
+          "id": "contactInfo",
+          "component": {
+            "Column": {
+              "children": { "explicitList": ["contactName", "contactPhone"] },
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "contactName",
+          "component": {
+            "Text": { "text": { "path": "/contact/name" }, "usageHint": "h4" }
+          }
+        },
+        {
+          "id": "contactPhone",
+          "component": {
+            "Text": {
+              "text": { "path": "/contact/phone_number" },
+              "usageHint": "body"
+            }
+          }
+        },
+        {
+          "id": "actionRow",
+          "component": {
+            "Row": {
+              "children": {
+                "explicitList": ["confirmDeleteButton", "cancelDeleteButton"]
+              },
+              "distribution": "spaceEvenly",
+              "alignment": "center"
+            }
+          }
+        },
+        {
+          "id": "confirmDeleteText",
+          "component": { "Text": { "text": { "literalString": "Confirm" } } }
+        },
+        {
+          "id": "confirmDeleteButton",
+          "component": {
+            "Button": {
+              "child": "confirmDeleteText",
+              "action": {
+                "name": "confirm-delete",
+                "context": [
+                  {
+                    "key": "id",
+                    "value": { "literalString": "__CONTACT_ID__" }
+                  },
+                  { "key": "name", "value": { "literalString": "__NAME__" } },
+                  {
+                    "key": "surfaceId",
+                    "value": { "literalString": "__SURFACE_ID__" }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "cancelDeleteText",
+          "component": { "Text": { "text": { "literalString": "Cancel" } } }
+        },
+        {
+          "id": "cancelDeleteButton",
+          "component": {
+            "Button": {
+              "child": "cancelDeleteText",
+              "action": {
+                "name": "cancel-delete",
+                "context": [
+                  {
+                    "key": "surfaceId",
+                    "value": { "literalString": "__SURFACE_ID__" }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "__SURFACE_ID__",
+      "contents": [
+        {
+          "key": "contact",
+          "valueMap": [
+            { "key": "name", "valueString": "__NAME__" },
+            { "key": "phone_number", "valueString": "__PHONE__" }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "beginRendering": {
+      "surfaceId": "__SURFACE_ID__",
+      "root": "root"
+    }
+  }
+]

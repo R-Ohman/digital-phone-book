@@ -1,0 +1,174 @@
+[
+  {
+    "surfaceUpdate": {
+      "surfaceId": "__SURFACE_ID__",
+      "components": [
+        { "id": "root", "component": { "Card": { "child": "main-column" } } },
+        {
+          "id": "main-column",
+          "component": {
+            "Column": {
+              "children": {
+                "explicitList": [
+                  "header-row",
+                  "divider",
+                  "phone-row",
+                  "actions"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "header-row",
+          "component": {
+            "Row": {
+              "distribution": "spaceBetween",
+              "alignment": "center",
+              "children": { "explicitList": ["name-text", "close-btn"] }
+            }
+          }
+        },
+        {
+          "id": "name-text",
+          "component": {
+            "Text": {
+              "text": { "literalString": "__NAME__" },
+              "usageHint": "h2"
+            }
+          }
+        },
+        {
+          "id": "close-btn-icon",
+          "component": { "Icon": { "name": { "literalString": "close" } } }
+        },
+        {
+          "id": "close-btn",
+          "component": {
+            "Button": {
+              "child": "close-btn-icon",
+              "action": {
+                "name": "close",
+                "context": [
+                  {
+                    "key": "surfaceId",
+                    "value": { "literalString": "__SURFACE_ID__" }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        { "id": "divider", "component": { "Divider": {} } },
+        {
+          "id": "phone-row",
+          "component": {
+            "Row": {
+              "children": { "explicitList": ["phone-icon", "phone-text"] }
+            }
+          }
+        },
+        {
+          "id": "phone-icon",
+          "component": { "Icon": { "name": { "literalString": "phone" } } }
+        },
+        {
+          "id": "phone-text",
+          "component": { "Text": { "text": { "literalString": "__PHONE__" } } }
+        },
+        {
+          "id": "actions",
+          "component": {
+            "List": {
+              "children": {
+                "explicitList": ["call-btn", "edit-btn", "delete-btn"]
+              }
+            }
+          }
+        },
+        {
+          "id": "call-btn-label",
+          "component": { "Text": { "text": { "literalString": "Call" } } }
+        },
+        {
+          "id": "call-btn",
+          "component": {
+            "Button": {
+              "child": "call-btn-label",
+              "action": {
+                "name": "call",
+                "context": [
+                  { "key": "phone", "value": { "literalString": "__PHONE__" } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "edit-btn-label",
+          "component": { "Text": { "text": { "literalString": "Edit" } } }
+        },
+        {
+          "id": "edit-btn",
+          "component": {
+            "Button": {
+              "child": "edit-btn-label",
+              "action": {
+                "name": "edit",
+                "context": [
+                  {
+                    "key": "id",
+                    "value": { "literalString": "__CONTACT_ID__" }
+                  },
+                  { "key": "name", "value": { "literalString": "__NAME__" } },
+                  { "key": "phone", "value": { "literalString": "__PHONE__" } },
+                  {
+                    "key": "surfaceId",
+                    "value": { "literalString": "__SURFACE_ID__" }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "id": "delete-btn-label",
+          "component": { "Text": { "text": { "literalString": "Delete" } } }
+        },
+        {
+          "id": "delete-btn",
+          "component": {
+            "Button": {
+              "child": "delete-btn-label",
+              "action": {
+                "name": "delete",
+                "context": [
+                  {
+                    "key": "id",
+                    "value": { "literalString": "__CONTACT_ID__" }
+                  },
+                  { "key": "name", "value": { "literalString": "__NAME__" } }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "dataModelUpdate": {
+      "surfaceId": "__SURFACE_ID__",
+      "contents": [
+        { "key": "name", "valueString": "__NAME__" },
+        { "key": "phone", "valueString": "__PHONE__" }
+      ]
+    }
+  },
+  {
+    "beginRendering": {
+      "surfaceId": "__SURFACE_ID__",
+      "root": "root"
+    }
+  }
+]
