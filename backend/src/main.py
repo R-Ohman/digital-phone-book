@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 import asyncio
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,6 +9,12 @@ from src.database import run_migrations
 from src.contacts.router import router as contacts_router
 from src.llm.router import router as llm_router
 from src.config import settings
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
 
 
 @asynccontextmanager

@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
@@ -11,6 +12,8 @@ from src.contacts.schemas import ContactResponse
 from .prompt_builder import PROMPT
 from .tools import build_tools
 from .ui_builder import build_contact_card, build_delete_confirmation
+
+logger = logging.getLogger(__name__)
 
 
 class ToolCallAgent:
@@ -40,6 +43,9 @@ class ToolCallAgent:
         """Stream tokens, then emit A2UI surface messages and a done signal."""
         tool_results: List[Tuple[str, str]] = []
         tool_calling_runs: set = set()
+        announced_tool_calls: set = set()  # run_id+tool pairs already logged
+
+        logger.info("▶ Processing started | prompt: %s", user_prompt)
 
         async for event in self._executor.astream_events(
             {"input": user_prompt, "chat_history": self._build_chat_history(history)},
@@ -48,11 +54,46 @@ class ToolCallAgent:
             event_name = event.get("event")
             run_id = event.get("run_id")
 
-            if event_name == "on_chat_model_stream":
+            if event_name == "on_chat_model_start":
+                logger.info("  LLM thinking...")
+
+            elif event_name == "on_chat_model_end":
+                usage = event.get("data", {}).get("output", {})
+                try:
+                    counts = usage.usage_metadata  # type: ignore[union-attr]
+                    logger.info(
+                        "  LLM finished | in=%s out=%s total=%s tokens",
+                        counts.get("input_tokens", "?"),
+                        counts.get("output_tokens", "?"),
+                        counts.get("total_tokens", "?"),
+                    )
+                except Exception:
+                    logger.info("  LLM finished")
+
+            elif event_name == "on_tool_start":
+                tool_name = event.get("name", "")
+                input_data = event.get("data", {}).get("input", "")
+                logger.info("[TOOL START] %s | Input: %s", tool_name, input_data)
+
+            elif event_name == "on_tool_end":
+                tool_name = event.get("name", "")
+                output = event.get("data", {}).get("output", "")
+                logger.info("[TOOL END] %s | Output: %s", tool_name, output)
+                if isinstance(output, str) and tool_name:
+                    tool_results.append((tool_name, output))
+
+            elif event_name == "on_chat_model_stream":
                 chunk = event.get("data", {}).get("chunk")
                 if chunk is not None:
-                    if getattr(chunk, "tool_call_chunks", None):
+                    tool_chunks = getattr(chunk, "tool_call_chunks", None)
+                    if tool_chunks:
                         tool_calling_runs.add(run_id)
+                        for tc in tool_chunks:
+                            tc_name = tc.get("name") or ""
+                            key = f"{run_id}:{tc_name}"
+                            if tc_name and key not in announced_tool_calls:
+                                announced_tool_calls.add(key)
+                                logger.info("  LLM requesting tool: %s", tc_name)
                     content = getattr(chunk, "content", "")
                     if (
                         isinstance(content, str)
@@ -61,12 +102,7 @@ class ToolCallAgent:
                     ):
                         yield {"type": "token", "text": content}
 
-            elif event_name == "on_tool_end":
-                tool_name = event.get("name", "")
-                output = event.get("data", {}).get("output", "")
-                if isinstance(output, str) and tool_name:
-                    tool_results.append((tool_name, output))
-
+        logger.info("■ Processing finished")
         a2ui = self._build_a2ui_from_steps(self._wrap_steps(tool_results))
         if a2ui:
             yield {"type": "a2ui", "messages": a2ui}

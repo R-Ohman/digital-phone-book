@@ -5,14 +5,13 @@
   </div>
 
   <div class="chat-panel__body">
-    <div class="chat-panel__content" aria-labelledby="chat-heading" aria-live="polite">
-      <div
-        [class]="{
-          'chat-panel__messages': true,
-          'chat-panel__messages--empty': !chat.messages().length,
-        }"
-        role="log"
-      >
+    <div
+      class="chat-panel__content"
+      [class.empty]="!chat.messages().length"
+      aria-labelledby="chat-heading"
+      aria-live="polite"
+    >
+      <div class="chat-panel__messages" role="log">
         @for (message of chat.messages(); track $index) {
           <div [class]="['chat-panel__message', 'chat-panel__message--' + message.role]">
             <div

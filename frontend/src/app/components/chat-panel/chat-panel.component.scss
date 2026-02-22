@@ -29,30 +29,26 @@
   }
 
   &__content {
-    flex: 1 1 auto;
     overflow: auto;
     padding: $space-3;
+    flex: 1 1 auto;
+
+    &.empty {
+      flex-grow: 0.5;
+      display: flex;
+      align-items: flex-end;
+    }
   }
 
   &__messages {
     width: 70rem;
     max-width: 100%;
     margin: 0 auto;
-
-    &--empty {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: $space-5 $space-3 $space-3;
-    }
   }
 
   &__empty-heading {
     margin: 0;
     font-size: 1.75rem;
-    font-weight: 500;
-    color: #fff;
     text-align: center;
   }
 
