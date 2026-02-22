@@ -1,4 +1,4 @@
-FROM node:24-bookworm
+FROM node:24-alpine
 
 WORKDIR /app
 
@@ -10,4 +10,4 @@ COPY . .
 
 EXPOSE 4200
 
-CMD ["npm", "start", "--", "--host", "0.0.0.0", "--poll", "1000", "--proxy-config", "src/proxy.conf.json"]
+CMD ["npx", "ng", "serve", "--host", "0.0.0.0", "--poll", "1000"]
