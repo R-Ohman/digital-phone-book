@@ -1,10 +1,10 @@
 import { ChangeDetectionStrategy, Component, viewChild, ViewEncapsulation } from '@angular/core';
+import { ChatPanelComponent } from '@components/chat-panel/chat-panel.component';
+import { ContactListComponent } from '@components/contact-list/contact-list.component';
+import { Contact } from '@models/contact';
+import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { SplitterModule } from 'primeng/splitter';
 import { ToastModule } from 'primeng/toast';
-import { ConfirmDialogModule } from 'primeng/confirmdialog';
-import { ContactListComponent } from '@components/contact-list/contact-list.component';
-import { ChatPanelComponent } from '@components/chat-panel/chat-panel.component';
-import { ConfirmPopup } from 'primeng/confirmpopup';
 
 @Component({
   selector: 'app-root',
@@ -14,7 +14,6 @@ import { ConfirmPopup } from 'primeng/confirmpopup';
     ConfirmDialogModule,
     ContactListComponent,
     ChatPanelComponent,
-    ConfirmPopup,
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss',
@@ -23,8 +22,17 @@ import { ConfirmPopup } from 'primeng/confirmpopup';
 })
 export class AppComponent {
   contactList = viewChild.required<ContactListComponent>(ContactListComponent);
+  chatPanel = viewChild.required<ChatPanelComponent>(ChatPanelComponent);
 
   onChatRefresh(): void {
     this.contactList().refresh();
+  }
+
+  onContactDeleted(contact: Contact): void {
+    this.chatPanel().onContactDeleted(contact);
+  }
+
+  onContactEdited(contact: Contact): void {
+    this.chatPanel().onContactEdited(contact);
   }
 }

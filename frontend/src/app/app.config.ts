@@ -1,6 +1,7 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { errorInterceptor } from './interceptors/error.interceptor';
 
 import { DEFAULT_CATALOG, provideA2UI } from '@a2ui/angular';
 import Aura from '@primeuix/themes/aura';
@@ -13,7 +14,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([errorInterceptor])),
     MessageService,
     ConfirmationService,
     providePrimeNG({

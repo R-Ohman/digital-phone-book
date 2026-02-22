@@ -66,7 +66,7 @@
   <app-contact-form-dialog
     [show]="contactFormVisible()"
     [contact]="selectedContact() ?? undefined"
-    (submit)="onSubmit()"
+    (submit)="onSubmit($event)"
     (close)="contactFormVisible.set(false)"
   />
 </div>

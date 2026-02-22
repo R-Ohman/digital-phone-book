@@ -13,6 +13,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { ChatLoadingComponent } from '@components/chat-panel/chat-loading/chat-loading.component';
 import { ChatService } from '@components/chat-panel/chat.service';
 import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
+import { Contact } from '@models/contact';
 import { MarkdownPipe } from '@pipes/markdown.pipe';
 import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
@@ -64,5 +65,13 @@ export class ChatPanelComponent {
 
     this.promptInput.reset();
     this.chat.send(prompt);
+  }
+
+  onContactDeleted(contact: Contact): void {
+    this.chat.removeContactFromSurfaces(contact.id);
+  }
+
+  onContactEdited(contact: Contact): void {
+    this.chat.updateContactInSurfaces(contact);
   }
 }

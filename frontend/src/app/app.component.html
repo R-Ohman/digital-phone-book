@@ -2,7 +2,10 @@
 
 <p-splitter [panelSizes]="[30, 70]">
   <ng-template pTemplate="panel">
-    <app-contact-list></app-contact-list>
+    <app-contact-list
+      (contactDeleted)="onContactDeleted($event)"
+      (contactEdited)="onContactEdited($event)"
+    ></app-contact-list>
   </ng-template>
   <ng-template pTemplate="panel">
     <app-chat-panel (refreshRequested)="onChatRefresh()"></app-chat-panel>

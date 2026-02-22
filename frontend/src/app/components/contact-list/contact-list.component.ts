@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, output, signal } from '@angular/core';
 import { ContactsApi } from '@api/contacts.api';
 import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
 import { Contact } from '@models/contact';
@@ -37,6 +37,9 @@ export class ContactListComponent implements OnInit {
   readonly #confirmationService = inject(ConfirmationService);
   readonly #messageService = inject(MessageService);
 
+  readonly contactDeleted = output<Contact>();
+  readonly contactEdited = output<Contact>();
+
   contacts = signal<Contact[]>([]);
   loading = signal<boolean>(false);
   contactFormVisible = signal<boolean>(false);
@@ -53,10 +56,7 @@ export class ContactListComponent implements OnInit {
     this.#contactsApi
       .getAll()
       .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: (data) => this.contacts.set(data),
-        error: (err: unknown) => this.#showError(err, 'Could not load contacts'),
-      });
+      .subscribe((data) => this.contacts.set(data));
   }
 
   openAdd(): void {
@@ -69,8 +69,11 @@ export class ContactListComponent implements OnInit {
     this.contactFormVisible.set(true);
   }
 
-  onSubmit(): void {
+  onSubmit(contact: Contact): void {
     this.contactFormVisible.set(false);
+    if (this.selectedContact()) {
+      this.contactEdited.emit(contact);
+    }
     this.refresh();
   }
 
@@ -101,21 +104,14 @@ export class ContactListComponent implements OnInit {
     this.#contactsApi
       .delete(contact.id)
       .pipe(finalize(() => this.loading.set(false)))
-      .subscribe({
-        next: () => {
-          this.#messageService.add({
-            severity: 'success',
-            summary: 'Deleted',
-            detail: 'Contact deleted',
-          });
-          this.refresh();
-        },
-        error: (err: unknown) => this.#showError(err, 'Delete failed'),
+      .subscribe(() => {
+        this.#messageService.add({
+          severity: 'success',
+          summary: 'Deleted',
+          detail: 'Contact deleted',
+        });
+        this.contactDeleted.emit(contact);
+        this.refresh();
       });
-  }
-
-  #showError(err: unknown, fallback: string): void {
-    const detail = err instanceof Error ? err.message : fallback;
-    this.#messageService.add({ severity: 'error', summary: 'Error', detail });
   }
 }

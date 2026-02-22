@@ -43,16 +43,13 @@ export class ContactFormDialogComponent {
         ? this.#contactsApi.update(this.contact()!.id, contact)
         : this.#contactsApi.create(contact);
 
-    req$.pipe(finalize(() => this.saving.set(false))).subscribe({
-      next: (contact) => {
-        this.#messageService.add({
-          severity: 'success',
-          summary: 'Saved',
-          detail: 'Contact saved',
-        });
-        this.submit.emit(contact);
-      },
-      error: (err: unknown) => this.#showError(err, `Failed to save ${contact.name}`),
+    req$.pipe(finalize(() => this.saving.set(false))).subscribe((saved) => {
+      this.#messageService.add({
+        severity: 'success',
+        summary: 'Saved',
+        detail: 'Contact saved',
+      });
+      this.submit.emit(saved);
     });
   }
 
@@ -60,10 +57,5 @@ export class ContactFormDialogComponent {
     if (!this.saving()) {
       this.close.emit();
     }
-  }
-
-  #showError(err: unknown, fallback: string): void {
-    const detail = err instanceof Error ? err.message : fallback;
-    this.#messageService.add({ severity: 'error', summary: 'Error', detail });
   }
 }

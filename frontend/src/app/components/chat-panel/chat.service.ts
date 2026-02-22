@@ -101,67 +101,6 @@ export class ChatService {
 
     this.processor.processMessages([
       {
-        surfaceUpdate: {
-          surfaceId,
-          components: [
-            {
-              id: 'name-text',
-              component: {
-                Text: { text: { literalString: contact.name }, usageHint: 'h2' },
-              },
-            },
-            {
-              id: 'phone-text',
-              component: { Text: { text: { literalString: contact.phoneNumber } } },
-            },
-            {
-              id: 'call-btn',
-              component: {
-                Button: {
-                  child: 'call-btn-label',
-                  action: {
-                    name: 'call',
-                    context: [{ key: 'phone', value: { literalString: contact.phoneNumber } }],
-                  },
-                },
-              },
-            },
-            {
-              id: 'edit-btn',
-              component: {
-                Button: {
-                  child: 'edit-btn-label',
-                  action: {
-                    name: 'edit',
-                    context: [
-                      { key: 'id', value: { literalString: contact.id } },
-                      { key: 'name', value: { literalString: contact.name } },
-                      { key: 'phone', value: { literalString: contact.phoneNumber } },
-                      { key: 'surfaceId', value: { literalString: surfaceId } },
-                    ],
-                  },
-                },
-              },
-            },
-            {
-              id: 'delete-btn',
-              component: {
-                Button: {
-                  child: 'delete-btn-label',
-                  action: {
-                    name: 'delete',
-                    context: [
-                      { key: 'id', value: { literalString: contact.id } },
-                      { key: 'name', value: { literalString: contact.name } },
-                    ],
-                  },
-                },
-              },
-            },
-          ],
-        },
-      },
-      {
         dataModelUpdate: {
           surfaceId,
           contents: [
@@ -175,31 +114,7 @@ export class ChatService {
     this.refreshRequested$.next();
   }
 
-  #handleA2uiChunk(messages: Types.ServerToClientMessage[], assistantIdx: number): void {
-    const backendIds = [
-      ...new Set(
-        messages.flatMap((msg) =>
-          [
-            msg.surfaceUpdate?.surfaceId,
-            msg.dataModelUpdate?.surfaceId,
-            msg.beginRendering?.surfaceId,
-            msg.deleteSurface?.surfaceId,
-          ].filter((id): id is string => Boolean(id)),
-        ),
-      ),
-    ];
-
-    this.processor.processMessages(messages);
-    this.surfaces.set(new Map(this.processor.getSurfaces()));
-
-    this.messages.update((arr) => {
-      const copy = [...arr];
-      copy[assistantIdx] = { ...copy[assistantIdx], surfaceIds: [...backendIds] };
-      return copy;
-    });
-  }
-
-  #removeContactFromSurfaces(contactId: string): void {
+  removeContactFromSurfaces(contactId: string): void {
     const allSurfaces = this.processor.getSurfaces();
     const surfaceMessages: Types.ServerToClientMessage[] = [];
     const deletedSurfaceIds: string[] = [];
@@ -236,6 +151,30 @@ export class ChatService {
         })),
       );
     }
+  }
+
+  #handleA2uiChunk(messages: Types.ServerToClientMessage[], assistantIdx: number): void {
+    const backendIds = [
+      ...new Set(
+        messages.flatMap((msg) =>
+          [
+            msg.surfaceUpdate?.surfaceId,
+            msg.dataModelUpdate?.surfaceId,
+            msg.beginRendering?.surfaceId,
+            msg.deleteSurface?.surfaceId,
+          ].filter((id): id is string => Boolean(id)),
+        ),
+      ),
+    ];
+
+    this.processor.processMessages(messages);
+    this.surfaces.set(new Map(this.processor.getSurfaces()));
+
+    this.messages.update((arr) => {
+      const copy = [...arr];
+      copy[assistantIdx] = { ...copy[assistantIdx], surfaceIds: [...backendIds] };
+      return copy;
+    });
   }
 
   #removeSurface(surfaceId: string): void {
@@ -315,14 +254,12 @@ export class ChatService {
               summary: 'Deleted',
               detail: `${name} deleted`,
             });
-            this.#removeContactFromSurfaces(id);
+            this.removeContactFromSurfaces(id);
             event.completion.next([]);
             event.completion.complete();
             this.refreshRequested$.next();
           },
-          error: (err: unknown) => {
-            const detail = err instanceof Error ? err.message : 'Delete failed';
-            this.#messageService.add({ severity: 'error', summary: 'Error', detail });
+          error: () => {
             event.completion.next([]);
             event.completion.complete();
           },
@@ -346,17 +283,39 @@ export class ChatService {
           summary: 'Deleted',
           detail: `${name} deleted`,
         });
-        this.#removeContactFromSurfaces(id);
+        this.removeContactFromSurfaces(id);
         event.completion.next([]);
         event.completion.complete();
         this.refreshRequested$.next();
       },
-      error: (err: unknown) => {
-        const detail = err instanceof Error ? err.message : 'Delete failed';
-        this.#messageService.add({ severity: 'error', summary: 'Error', detail });
+      error: () => {
         event.completion.next([]);
         event.completion.complete();
       },
     });
+  }
+
+  updateContactInSurfaces(contact: Contact): void {
+    const allSurfaces = this.processor.getSurfaces();
+    const surfaceMessages: Types.ServerToClientMessage[] = [];
+
+    for (const [surfaceId] of allSurfaces) {
+      if (surfaceId.startsWith('contact-card-') && surfaceId.endsWith(contact.id)) {
+        surfaceMessages.push({
+          dataModelUpdate: {
+            surfaceId,
+            contents: [
+              { key: 'name', valueString: contact.name },
+              { key: 'phone', valueString: contact.phoneNumber },
+            ],
+          },
+        });
+      }
+    }
+
+    if (surfaceMessages.length) {
+      this.processor.processMessages(surfaceMessages);
+      this.surfaces.set(new Map(this.processor.getSurfaces()));
+    }
   }
 }
