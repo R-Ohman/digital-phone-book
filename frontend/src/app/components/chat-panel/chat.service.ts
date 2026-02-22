@@ -60,10 +60,10 @@ export class ChatService {
     this.#llmApi
       .sendPromptStream({ prompt, history })
       .pipe(finalize(() => this.sending.set(false)))
-      .subscribe({
-        next: (chunk) => {
-          if (chunk.type === 'token') {
-            if (!this.streamingStarted()) this.streamingStarted.set(true);
+      .subscribe((chunk) => {
+        switch (chunk.type) {
+          case 'token': {
+            this.streamingStarted.set(true);
             this.messages.update((arr) => {
               const copy = [...arr];
               copy[assistantIdx] = {
@@ -72,22 +72,26 @@ export class ChatService {
               };
               return copy;
             });
-          } else if (chunk.type === 'a2ui') {
+
+            break;
+          }
+          case 'a2ui': {
             this.#handleA2uiChunk(chunk.messages, assistantIdx);
-          } else if (chunk.type === 'done') {
+            break;
+          }
+          case 'done': {
             this.refreshRequested$.next();
-          } else if (chunk.type === 'error') {
+            break;
+          }
+          case 'error': {
             this.#messageService.add({
               severity: 'error',
               summary: 'Chat Error',
               detail: chunk.detail,
             });
+            break;
           }
-        },
-        error: (err: unknown) => {
-          const detail = err instanceof Error ? err.message : 'Failed to send message';
-          this.#messageService.add({ severity: 'error', summary: 'Chat Error', detail });
-        },
+        }
       });
   }
 
@@ -153,6 +157,30 @@ export class ChatService {
     }
   }
 
+  updateContactInSurfaces(contact: Contact): void {
+    const allSurfaces = this.processor.getSurfaces();
+    const surfaceMessages: Types.ServerToClientMessage[] = [];
+
+    for (const [surfaceId] of allSurfaces) {
+      if (surfaceId.endsWith(contact.id)) {
+        surfaceMessages.push({
+          dataModelUpdate: {
+            surfaceId,
+            contents: [
+              { key: 'name', valueString: contact.name },
+              { key: 'phone', valueString: contact.phoneNumber },
+            ],
+          },
+        });
+      }
+    }
+
+    if (surfaceMessages.length) {
+      this.processor.processMessages(surfaceMessages);
+      this.surfaces.set(new Map(this.processor.getSurfaces()));
+    }
+  }
+
   #handleA2uiChunk(messages: Types.ServerToClientMessage[], assistantIdx: number): void {
     const backendIds = [
       ...new Set(
@@ -189,44 +217,42 @@ export class ChatService {
   }
 
   #handleUserAction(event: DispatchedEvent, userAction: UserAction | undefined): void {
-    if (userAction?.name === 'call') {
-      const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
-      if (phone) window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
-      event.completion.next([]);
-      event.completion.complete();
-      return;
-    }
-
-    if (userAction?.name === 'close') {
-      this.#removeSurface(userAction.surfaceId);
-      event.completion.next([]);
-      return;
-    }
-
-    if (userAction?.name === 'delete') {
-      this.#handleDeleteAction(event, userAction);
-      return;
-    }
-
-    if (userAction?.name === 'confirm-delete') {
-      this.#handleConfirmDeleteAction(event, userAction);
-      return;
-    }
-
-    if (userAction?.name === 'cancel-delete') {
-      this.#removeSurface(userAction.surfaceId);
-      event.completion.next([]);
-      return;
-    }
-
-    if (userAction?.name === 'edit') {
-      const id = (userAction.context?.['id'] as string | undefined) ?? '';
-      const name = (userAction.context?.['name'] as string | undefined) ?? '';
-      const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
-      this.#editSurfaceId = userAction.surfaceId;
-      this.editingContact.set({ id, name, phoneNumber: phone });
-      this.editDialogVisible.set(true);
-      event.completion.next([]);
+    switch (userAction?.name) {
+      case 'call': {
+        const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
+        if (phone) window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
+        event.completion.next([]);
+        event.completion.complete();
+        return;
+      }
+      case 'close': {
+        this.#removeSurface(userAction.surfaceId);
+        event.completion.next([]);
+        return;
+      }
+      case 'delete': {
+        this.#handleDeleteAction(event, userAction);
+        return;
+      }
+      case 'confirm-delete': {
+        this.#handleConfirmDeleteAction(event, userAction);
+        return;
+      }
+      case 'cancel-delete': {
+        this.#removeSurface(userAction.surfaceId);
+        event.completion.next([]);
+        return;
+      }
+      case 'edit': {
+        const id = (userAction.context?.['id'] as string | undefined) ?? '';
+        const name = (userAction.context?.['name'] as string | undefined) ?? '';
+        const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
+        this.#editSurfaceId = userAction.surfaceId;
+        this.editingContact.set({ id, name, phoneNumber: phone });
+        this.editDialogVisible.set(true);
+        event.completion.next([]);
+        return;
+      }
     }
   }
 
@@ -241,23 +267,7 @@ export class ChatService {
       rejectButtonProps: { label: 'Cancel', severity: 'secondary', rounded: true, outlined: true },
       acceptButtonProps: { label: 'Delete', severity: 'danger', rounded: true },
       accept: () => {
-        this.#contactsApi.delete(id).subscribe({
-          next: () => {
-            this.#messageService.add({
-              severity: 'success',
-              summary: 'Deleted',
-              detail: `${name} deleted`,
-            });
-            this.removeContactFromSurfaces(id);
-            event.completion.next([]);
-            event.completion.complete();
-            this.refreshRequested$.next();
-          },
-          error: () => {
-            event.completion.next([]);
-            event.completion.complete();
-          },
-        });
+        this.#handleConfirmDeleteAction(event, userAction);
       },
       reject: () => {
         event.completion.next([]);
@@ -287,29 +297,5 @@ export class ChatService {
         event.completion.complete();
       },
     });
-  }
-
-  updateContactInSurfaces(contact: Contact): void {
-    const allSurfaces = this.processor.getSurfaces();
-    const surfaceMessages: Types.ServerToClientMessage[] = [];
-
-    for (const [surfaceId] of allSurfaces) {
-      if (surfaceId.endsWith(contact.id)) {
-        surfaceMessages.push({
-          dataModelUpdate: {
-            surfaceId,
-            contents: [
-              { key: 'name', valueString: contact.name },
-              { key: 'phone', valueString: contact.phoneNumber },
-            ],
-          },
-        });
-      }
-    }
-
-    if (surfaceMessages.length) {
-      this.processor.processMessages(surfaceMessages);
-      this.surfaces.set(new Map(this.processor.getSurfaces()));
-    }
   }
 }

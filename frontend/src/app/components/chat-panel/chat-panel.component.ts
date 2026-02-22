@@ -7,6 +7,7 @@ import {
   effect,
   ElementRef,
   inject,
+  OnInit,
   output,
   viewChild,
   ViewEncapsulation,
@@ -47,7 +48,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
 })
-export class ChatPanelComponent {
+export class ChatPanelComponent implements OnInit {
   readonly #formBuilder = inject(FormBuilder).nonNullable;
   readonly #destroyRef = inject(DestroyRef);
   protected readonly chat = inject(ChatService);
@@ -75,7 +76,9 @@ export class ChatPanelComponent {
         }
       }, 50);
     });
+  }
 
+  ngOnInit(): void {
     this.chat.refreshRequested$
       .pipe(takeUntilDestroyed(this.#destroyRef))
       .subscribe(() => this.refreshRequested.emit());

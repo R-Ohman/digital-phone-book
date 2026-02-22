@@ -37,15 +37,13 @@ export class ContactListComponent implements OnInit {
   readonly #confirmationService = inject(ConfirmationService);
   readonly #messageService = inject(MessageService);
 
-  readonly contactDeleted = output<Contact>();
-  readonly contactEdited = output<Contact>();
+  contactDeleted = output<Contact>();
+  contactEdited = output<Contact>();
 
   contacts = signal<Contact[]>([]);
   loading = signal<boolean>(false);
   contactFormVisible = signal<boolean>(false);
   selectedContact = signal<Contact | null>(null);
-
-  constructor() {}
 
   ngOnInit(): void {
     this.refresh();
