@@ -1,37 +1,25 @@
-import { MessageProcessor, Surface } from '@a2ui/angular';
+import { Surface } from '@a2ui/angular';
 import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  effect,
   inject,
   output,
-  signal,
   ViewEncapsulation,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { ContactsApi } from '@api/contacts.api';
-import { LlmApi } from '@api/llm.api';
 import { ChatLoadingComponent } from '@components/chat-panel/chat-loading/chat-loading.component';
-import { ContactFormComponent } from '@components/contact-form/contact-form.component';
-import { Contact, ContactCreate } from '@models/contact';
-import { ChatHistoryMessage } from '@models/prompt';
-import { ConfirmationService, MessageService } from 'primeng/api';
+import { ChatService } from '@components/chat-panel/chat.service';
+import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
+import { MarkdownPipe } from '@pipes/markdown.pipe';
+import { ConfirmationService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
-import { finalize } from 'rxjs/operators';
-import { MarkdownPipe } from '../../pipes/markdown.pipe';
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  text: string;
-  surfaceIds?: string[];
-}
 
 @Component({
   selector: 'app-chat-panel',
@@ -46,377 +34,35 @@ interface ChatMessage {
     FormsModule,
     Surface,
     ChatLoadingComponent,
-    ContactFormComponent,
     MarkdownPipe,
+    ContactFormDialogComponent,
   ],
-  providers: [ConfirmationService],
+  providers: [ConfirmationService, ChatService],
   templateUrl: './chat-panel.component.html',
   styleUrl: './chat-panel.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
 })
 export class ChatPanelComponent {
-  readonly #llmApi = inject(LlmApi);
-  readonly #contactsApi = inject(ContactsApi);
   readonly #formBuilder = inject(FormBuilder).nonNullable;
-  readonly #messageService = inject(MessageService);
-  readonly #confirmationService = inject(ConfirmationService);
   readonly #destroyRef = inject(DestroyRef);
-  protected readonly processor = inject(MessageProcessor);
+  protected readonly chat = inject(ChatService);
 
   refreshRequested = output<void>();
-  messages = signal<ChatMessage[]>([
-    { role: 'assistant', text: 'Hi there! How can I assist you?' },
-  ]);
-  sending = signal<boolean>(false);
-  streamingStarted = signal<boolean>(false);
-  surfaces = signal<ReadonlyMap<string, any>>(new Map());
-  editDialogVisible = signal<boolean>(false);
-  editingContact = signal<Contact | null>(null);
-  editSaving = signal<boolean>(false);
 
   promptInput = this.#formBuilder.control<string>('', [Validators.maxLength(1024)]);
-  readonly #contactSurfaceMap = new Map<string, string>();
-  #editSurfaceId = '';
 
   constructor() {
-    effect(() => {
-      if (this.sending()) {
-        this.promptInput.disable();
-      } else {
-        this.promptInput.enable();
-      }
-    });
-
-    this.processor.events.pipe(takeUntilDestroyed(this.#destroyRef)).subscribe((event) => {
-      const userAction = (event.message as any)?.userAction;
-      debugger;
-      if (userAction?.name === 'call') {
-        const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
-        if (phone) {
-          window.location.href = `tel:${phone.replace(/\s+/g, '')}`;
-        }
-        event.completion.next([]);
-        event.completion.complete();
-      } else if (userAction?.name === 'close') {
-        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-        if (surfaceId) {
-          this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
-          this.surfaces.set(new Map(this.processor.getSurfaces()));
-          this.messages.update((arr) =>
-            arr.map((msg) => ({
-              ...msg,
-              surfaceIds: msg.surfaceIds?.filter((id) => id !== surfaceId),
-            })),
-          );
-        }
-      } else if (userAction?.name === 'delete') {
-        debugger;
-        const id = (userAction.context?.['id'] as string | undefined) ?? '';
-        const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
-        const surfaceId = this.#contactSurfaceMap.get(id);
-        this.#confirmationService.confirm({
-          message: `Are you sure you want to delete ${name}?`,
-          header: 'Confirm Delete',
-          icon: 'pi pi-exclamation-triangle',
-          rejectButtonProps: { label: 'Cancel', severity: 'secondary', outlined: true },
-          acceptButtonProps: { label: 'Delete', severity: 'danger' },
-          accept: () => {
-            this.#contactsApi.delete(id).subscribe({
-              next: () => {
-                this.#messageService.add({
-                  severity: 'success',
-                  summary: 'Deleted',
-                  detail: `${name} deleted`,
-                });
-                if (surfaceId) {
-                  this.processor.processMessages([
-                    {
-                      surfaceUpdate: {
-                        surfaceId,
-                        components: [
-                          {
-                            id: 'actions',
-                            component: { List: { children: { explicitList: ['call-btn'] } } },
-                          },
-                        ],
-                      },
-                    } as any,
-                  ]);
-                  this.surfaces.set(new Map(this.processor.getSurfaces()));
-                }
-                event.completion.next([]);
-                event.completion.complete();
-                this.refreshRequested.emit();
-              },
-              error: (err: unknown) => {
-                const detail = err instanceof Error ? err.message : 'Delete failed';
-                this.#messageService.add({ severity: 'error', summary: 'Error', detail });
-                event.completion.next([]);
-                event.completion.complete();
-              },
-            });
-          },
-          reject: () => {
-            event.completion.next([]);
-            event.completion.complete();
-          },
-        });
-      } else if (userAction?.name === 'confirm-delete') {
-        const id = (userAction.context?.['id'] as string | undefined) ?? '';
-        const name = (userAction.context?.['name'] as string | undefined) ?? 'this contact';
-        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-        this.#contactsApi.delete(id).subscribe({
-          next: () => {
-            this.#messageService.add({
-              severity: 'success',
-              summary: 'Deleted',
-              detail: `${name} deleted`,
-            });
-            if (surfaceId) {
-              this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
-              this.surfaces.set(new Map(this.processor.getSurfaces()));
-              this.messages.update((arr) =>
-                arr.map((msg) => ({
-                  ...msg,
-                  surfaceIds: msg.surfaceIds?.filter((sid) => sid !== surfaceId),
-                })),
-              );
-            }
-            event.completion.next([]);
-            event.completion.complete();
-            this.refreshRequested.emit();
-          },
-          error: (err: unknown) => {
-            const detail = err instanceof Error ? err.message : 'Delete failed';
-            this.#messageService.add({ severity: 'error', summary: 'Error', detail });
-            event.completion.next([]);
-            event.completion.complete();
-          },
-        });
-      } else if (userAction?.name === 'cancel-delete') {
-        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-        if (surfaceId) {
-          this.processor.processMessages([{ deleteSurface: { surfaceId } } as any]);
-          this.surfaces.set(new Map(this.processor.getSurfaces()));
-          this.messages.update((arr) =>
-            arr.map((msg) => ({
-              ...msg,
-              surfaceIds: msg.surfaceIds?.filter((sid) => sid !== surfaceId),
-            })),
-          );
-        }
-        event.completion.next([]);
-        event.completion.complete();
-      } else if (userAction?.name === 'edit') {
-        const id = (userAction.context?.['id'] as string | undefined) ?? '';
-        const name = (userAction.context?.['name'] as string | undefined) ?? '';
-        const phone = (userAction.context?.['phone'] as string | undefined) ?? '';
-        const surfaceId = (userAction.context?.['surfaceId'] as string | undefined) ?? '';
-        this.#editSurfaceId = surfaceId;
-        this.editingContact.set({ id, name, phoneNumber: phone });
-        this.editDialogVisible.set(true);
-        event.completion.next([]);
-        event.completion.complete();
-      }
-    });
-  }
-
-  onEditSubmit(value: ContactCreate): void {
-    const contact = this.editingContact();
-    if (!contact || this.editSaving()) return;
-    this.editSaving.set(true);
-    this.#contactsApi
-      .update(contact.id, value)
-      .pipe(finalize(() => this.editSaving.set(false)))
-      .subscribe({
-        next: (updated) => {
-          this.#messageService.add({
-            severity: 'success',
-            summary: 'Saved',
-            detail: 'Contact updated',
-          });
-          this.editDialogVisible.set(false);
-          const surfaceId = this.#editSurfaceId;
-          if (surfaceId) {
-            this.processor.processMessages([
-              {
-                surfaceUpdate: {
-                  surfaceId,
-                  components: [
-                    {
-                      id: 'name-text',
-                      component: {
-                        Text: { text: { literalString: updated.name }, usageHint: 'h2' },
-                      },
-                    },
-                    {
-                      id: 'phone-text',
-                      component: { Text: { text: { literalString: updated.phoneNumber } } },
-                    },
-                    {
-                      id: 'call-btn',
-                      component: {
-                        Button: {
-                          child: 'call-btn-label',
-                          action: {
-                            name: 'call',
-                            context: [
-                              { key: 'phone', value: { literalString: updated.phoneNumber } },
-                            ],
-                          },
-                        },
-                      },
-                    },
-                    {
-                      id: 'edit-btn',
-                      component: {
-                        Button: {
-                          child: 'edit-btn-label',
-                          action: {
-                            name: 'edit',
-                            context: [
-                              { key: 'id', value: { literalString: updated.id } },
-                              { key: 'name', value: { literalString: updated.name } },
-                              { key: 'phone', value: { literalString: updated.phoneNumber } },
-                              { key: 'surfaceId', value: { literalString: surfaceId } },
-                            ],
-                          },
-                        },
-                      },
-                    },
-                    {
-                      id: 'delete-btn',
-                      component: {
-                        Button: {
-                          child: 'delete-btn-label',
-                          action: {
-                            name: 'delete',
-                            context: [
-                              { key: 'id', value: { literalString: updated.id } },
-                              { key: 'name', value: { literalString: updated.name } },
-                            ],
-                          },
-                        },
-                      },
-                    },
-                  ],
-                },
-              } as any,
-              {
-                dataModelUpdate: {
-                  surfaceId,
-                  contents: [
-                    { key: 'name', valueString: updated.name },
-                    { key: 'phone', valueString: updated.phoneNumber },
-                  ],
-                },
-              } as any,
-            ]);
-            this.surfaces.set(new Map(this.processor.getSurfaces()));
-            this.#contactSurfaceMap.set(updated.id, surfaceId);
-          }
-          this.refreshRequested.emit();
-        },
-        error: (err: unknown) => {
-          const detail = err instanceof Error ? err.message : 'Update failed';
-          this.#messageService.add({ severity: 'error', summary: 'Error', detail });
-        },
-      });
-  }
-
-  onEditCancel(): void {
-    if (!this.editSaving()) this.editDialogVisible.set(false);
+    this.chat.refreshRequested$
+      .pipe(takeUntilDestroyed(this.#destroyRef))
+      .subscribe(() => this.refreshRequested.emit());
   }
 
   send(): void {
-    if (this.promptInput.invalid || this.sending()) return;
     const prompt = this.promptInput.value.trim();
-    if (!prompt) return;
-
-    const history: ChatHistoryMessage[] = this.messages()
-      .filter((msg) => msg.text)
-      .map((msg) => ({ role: msg.role, content: msg.text }));
-
-    this.sending.set(true);
-    this.streamingStarted.set(false);
-    this.messages.update((arr) => [...arr, { role: 'user', text: prompt }]);
-    this.messages.update((arr) => [...arr, { role: 'assistant', text: '' }]);
-    const assistantIdx = this.messages().length - 1;
+    if (this.promptInput.invalid || this.chat.sending() || !prompt) return;
 
     this.promptInput.reset();
-    this.#llmApi
-      .sendPromptStream({ prompt, history })
-      .pipe(finalize(() => this.sending.set(false)))
-      .subscribe({
-        next: (chunk) => {
-          if (chunk.type === 'token') {
-            if (!this.streamingStarted()) this.streamingStarted.set(true);
-            this.messages.update((arr) => {
-              const copy = [...arr];
-              copy[assistantIdx] = {
-                ...copy[assistantIdx],
-                text: copy[assistantIdx].text + chunk.text,
-              };
-              return copy;
-            });
-          } else if (chunk.type === 'a2ui') {
-            const backendIds = [
-              ...new Set(
-                (chunk.messages as any[]).flatMap((msg) =>
-                  ['surfaceUpdate', 'dataModelUpdate', 'beginRendering', 'deleteSurface']
-                    .map((k) => msg[k]?.surfaceId)
-                    .filter(Boolean),
-                ),
-              ),
-            ] as string[];
-            const remapped = (chunk.messages as any[]).map((msg) => {
-              const clone = JSON.parse(JSON.stringify(msg));
-              for (const key of [
-                'surfaceUpdate',
-                'dataModelUpdate',
-                'beginRendering',
-                'deleteSurface',
-              ]) {
-                if (clone[key]?.surfaceId) {
-                  clone[key].surfaceId = clone[key].surfaceId;
-                }
-              }
-              return clone;
-            });
-            this.processor.processMessages(remapped);
-            this.surfaces.set(new Map(this.processor.getSurfaces()));
-            const surfaceIds = [...backendIds];
-            for (const msg of remapped) {
-              if (msg.surfaceUpdate) {
-                const deleteBtn = msg.surfaceUpdate.components?.find(
-                  (c: any) => c.id === 'delete-btn',
-                );
-                const contactId: string | undefined =
-                  deleteBtn?.component?.Button?.action?.context?.find((c: any) => c.key === 'id')
-                    ?.value?.literalString;
-                if (contactId) this.#contactSurfaceMap.set(contactId, msg.surfaceUpdate.surfaceId);
-              }
-            }
-            this.messages.update((arr) => {
-              const copy = [...arr];
-              copy[assistantIdx] = { ...copy[assistantIdx], surfaceIds };
-              return copy;
-            });
-          } else if (chunk.type === 'done') {
-            this.refreshRequested.emit();
-          } else if (chunk.type === 'error') {
-            this.#messageService.add({
-              severity: 'error',
-              summary: 'Chat Error',
-              detail: chunk.detail,
-            });
-          }
-        },
-        error: (err: unknown) => {
-          const detail = err instanceof Error ? err.message : 'Failed to send message';
-          this.#messageService.add({ severity: 'error', summary: 'Chat Error', detail });
-        },
-      });
+    this.chat.send(prompt);
   }
 }

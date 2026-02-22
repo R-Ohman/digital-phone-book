@@ -11,7 +11,7 @@ import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TableModule } from 'primeng/table';
 import { ToolbarModule } from 'primeng/toolbar';
 import { finalize } from 'rxjs/operators';
-import { ContactFormComponent } from '../contact-form/contact-form.component';
+import { ContactFormDialogComponent } from '@components/contact-form-dialog/contact-form-dialog.component';
 
 @Component({
   selector: 'app-contact-list',
@@ -23,8 +23,8 @@ import { ContactFormComponent } from '../contact-form/contact-form.component';
     ToolbarModule,
     ConfirmDialogModule,
     ProgressSpinnerModule,
-    ContactFormComponent,
     ConfirmPopup,
+    ContactFormDialogComponent,
   ],
   templateUrl: './contact-list.component.html',
   styleUrl: './contact-list.component.scss',
@@ -37,10 +37,8 @@ export class ContactListComponent implements OnInit {
 
   contacts = signal<Contact[]>([]);
   loading = signal<boolean>(false);
-  dialogVisible = signal<boolean>(false);
-  saving = signal<boolean>(false);
-  editing = signal<boolean>(false);
-  selected = signal<Contact | null>(null);
+  contactFormVisible = signal<boolean>(false);
+  selectedContact = signal<Contact | null>(null);
 
   constructor() {}
 
@@ -60,43 +58,18 @@ export class ContactListComponent implements OnInit {
   }
 
   openAdd(): void {
-    this.editing.set(false);
-    this.selected.set(null);
-    this.dialogVisible.set(true);
+    this.selectedContact.set(null);
+    this.contactFormVisible.set(true);
   }
 
   openEdit(contact: Contact): void {
-    this.editing.set(true);
-    this.selected.set(contact);
-    this.dialogVisible.set(true);
+    this.selectedContact.set(contact);
+    this.contactFormVisible.set(true);
   }
 
-  onSubmit(value: { name: string; phoneNumber: string }): void {
-    if (this.saving()) return;
-    this.saving.set(true);
-    const req$ =
-      this.editing() && this.selected()
-        ? this.#contactsApi.update(this.selected()!.id, value)
-        : this.#contactsApi.create(value);
-
-    req$.pipe(finalize(() => this.saving.set(false))).subscribe({
-      next: () => {
-        this.#messageService.add({
-          severity: 'success',
-          summary: 'Saved',
-          detail: 'Contact saved',
-        });
-        this.dialogVisible.set(false);
-        this.refresh();
-      },
-      error: (err: unknown) => this.#showError(err, 'Save failed'),
-    });
-  }
-
-  onCancel(): void {
-    if (!this.saving()) {
-      this.dialogVisible.set(false);
-    }
+  onSubmit(): void {
+    this.contactFormVisible.set(false);
+    this.refresh();
   }
 
   confirmDelete(contact: Contact, event: Event): void {

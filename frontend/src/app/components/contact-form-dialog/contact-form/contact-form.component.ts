@@ -12,7 +12,7 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { InputTextModule } from 'primeng/inputtext';
 import { ButtonModule } from 'primeng/button';
 import { Contact, ContactCreate } from '@models/contact';
-import { ContactFormBuilder } from '@components/contact-form/contact-form-builder.service';
+import { ContactFormBuilder } from '@components/contact-form-dialog/contact-form/contact-form-builder.service';
 
 type ContactForm = FormGroup<{ name: FormControl<string>; phoneNumber: FormControl<string> }>;
 

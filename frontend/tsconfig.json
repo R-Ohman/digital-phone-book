@@ -17,7 +17,8 @@
     "paths": {
       "@components/*": ["./src/app/components/*"],
       "@api/*": ["./src/app/api/*"],
-      "@models/*": ["./src/app/models/*"]
+      "@models/*": ["./src/app/models/*"],
+      "@pipes/*": ["./src/app/pipes/*"]
     }
   },
   "angularCompilerOptions": {

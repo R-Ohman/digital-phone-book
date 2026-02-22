@@ -1,0 +1,18 @@
+<p-dialog
+  (onHide)="onClose()"
+  [closable]="!saving()"
+  [closeOnEscape]="!saving()"
+  [draggable]="false"
+  [header]="editing() ? 'Edit Contact' : 'Add Contact'"
+  [modal]="true"
+  [resizable]="false"
+  [style]="{ width: '32rem' }"
+  [visible]="show()"
+  ariaLabel="Contact form dialog"
+>
+  <app-contact-form
+    [model]="contact() ?? undefined"
+    (submit)="onSubmit($event)"
+    (cancel)="onClose()"
+  ></app-contact-form>
+</p-dialog>

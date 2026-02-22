@@ -1,24 +1,3 @@
-<p-confirmDialog />
-
-<p-dialog
-  (visibleChange)="editDialogVisible.set($event)"
-  [closable]="!editSaving()"
-  [closeOnEscape]="!editSaving()"
-  [draggable]="false"
-  header="Edit Contact"
-  [modal]="true"
-  [resizable]="false"
-  [style]="{ width: '32rem' }"
-  [visible]="editDialogVisible()"
-  ariaLabel="Edit contact dialog"
->
-  <app-contact-form
-    [model]="editingContact() ?? undefined"
-    (submit)="onEditSubmit($event)"
-    (cancel)="onEditCancel()"
-  ></app-contact-form>
-</p-dialog>
-
 <div class="chat-panel">
   <div class="chat-panel__heading" id="chat-heading">
     <i class="pi pi-comments"></i>
@@ -26,7 +5,7 @@
   </div>
 
   <div aria-labelledby="chat-heading" aria-live="polite" class="chat-panel__messages" role="log">
-    @for (message of messages(); track $index) {
+    @for (message of chat.messages(); track $index) {
       <div [class]="['chat-panel__message', 'chat-panel__message--' + message.role]">
         <div
           class="chat-panel__bubble"
@@ -37,7 +16,7 @@
 
       <div class="chat-panel__surfaces">
         @for (surfaceId of message.surfaceIds ?? []; track surfaceId) {
-          @if (surfaces().get(surfaceId); as surface) {
+          @if (chat.surfaces().get(surfaceId); as surface) {
             <div class="chat-panel__message chat-panel__message--assistant">
               <a2ui-surface [id]="surfaceId" [surfaceId]="surfaceId" [surface]="surface" />
             </div>
@@ -45,14 +24,14 @@
         }
       </div>
     }
-    @if (sending() && !streamingStarted()) {
+    @if (chat.sending() && !chat.streamingStarted()) {
       <app-chat-loading />
     }
   </div>
 
   <form
     (ngSubmit)="send()"
-    [class.chat-panel__composer--sending]="sending()"
+    [class.chat-panel__composer--sending]="chat.sending()"
     class="chat-panel__composer"
     novalidate
   >
@@ -69,3 +48,12 @@
     <button [rounded]="true" icon="pi pi-send" label="Send" pButton type="submit"></button>
   </form>
 </div>
+
+<p-confirmDialog />
+
+<app-contact-form-dialog
+  [show]="chat.editDialogVisible()"
+  [contact]="chat.editingContact() ?? undefined"
+  (submit)="chat.onEditSubmit($event)"
+  (close)="chat.editDialogVisible.set(false)"
+/>
