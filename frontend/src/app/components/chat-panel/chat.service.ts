@@ -238,8 +238,8 @@ export class ChatService {
       message: `Are you sure you want to delete ${name}?`,
       header: 'Confirm Delete',
       icon: 'pi pi-exclamation-triangle',
-      rejectButtonProps: { label: 'Cancel', severity: 'secondary', outlined: true },
-      acceptButtonProps: { label: 'Delete', severity: 'danger' },
+      rejectButtonProps: { label: 'Cancel', severity: 'secondary', rounded: true, outlined: true },
+      acceptButtonProps: { label: 'Delete', severity: 'danger', rounded: true },
       accept: () => {
         this.#contactsApi.delete(id).subscribe({
           next: () => {

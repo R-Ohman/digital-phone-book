@@ -23,6 +23,7 @@ Rules:
 - When looking up one or more specific named contacts, call get_contact once per name. Never use get_all_contacts for named lookups.
 - Only use get_all_contacts when the user asks for the full list, all contacts, or wants to filter/search without specifying exact names.
 - Adding a contact requires BOTH a name AND a phone number. If the phone number is missing, ask for it first — do NOT call add_contact.
+- For update requests (changing name or phone number), call update_contact directly with the current name and new values. Do NOT call get_contact before it.
 - For delete requests, call propose_delete_contact directly. Never call get_contact before it.
 - For conditional requests (e.g. "if X exists update them"), call get_contact first, then decide.
 - Complete all requested operations before replying.
@@ -208,7 +209,9 @@ class ToolCallAgent:
                     lines = ["Multiple contacts with that name were found:"]
                     for c in data["contacts"]:
                         lines.append(f"- **{c['name']}**: {c['phone_number']}")
-                    lines.append("\nPlease specify which contact you want to delete.")
+                    lines.append(
+                        "\nYou can delete the contact manually using a card below."
+                    )
                     parts.append("\n".join(lines))
                 elif data.get("proposed"):
                     parts.append(
@@ -231,17 +234,27 @@ class ToolCallAgent:
             except (json.JSONDecodeError, TypeError):
                 continue
 
+            if not isinstance(data, dict):
+                continue
+
             contact_id = data.get("id")
 
             if tool_name in ("get_contact", "add_contact", "update_contact"):
-                if data.get("multiple_found") and tool_name == "update_contact":
+                if data.get("multiple_found") and tool_name in (
+                    "get_contact",
+                    "update_contact",
+                ):
                     for c in data["contacts"]:
                         if c["id"] not in contact_card_ids:
                             contact_card_ids.add(c["id"])
                             a2ui_messages.extend(
                                 build_contact_card(ContactResponse.model_validate(c))
                             )
-                elif data.get("success") and contact_id not in contact_card_ids:
+                elif (
+                    data.get("success")
+                    and not data.get("multiple_found")
+                    and contact_id not in contact_card_ids
+                ):
                     contact_card_ids.add(contact_id)
                     a2ui_messages.extend(
                         build_contact_card(ContactResponse.model_validate(data))

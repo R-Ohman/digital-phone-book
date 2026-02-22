@@ -57,7 +57,7 @@ services:
       test: ["CMD-SHELL", "ollama --version || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 20
+      retries: 5
 
 volumes:
   postgres_data:

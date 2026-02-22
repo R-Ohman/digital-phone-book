@@ -12,7 +12,7 @@ import { ProgressBarModule } from 'primeng/progressbar';
 import { ProgressSpinnerModule } from 'primeng/progressspinner';
 import { TableModule } from 'primeng/table';
 import { ToolbarModule } from 'primeng/toolbar';
-import { finalize } from 'rxjs/operators';
+import { finalize, map } from 'rxjs/operators';
 
 @Component({
   selector: 'app-contact-list',
@@ -55,8 +55,11 @@ export class ContactListComponent implements OnInit {
     this.loading.set(true);
     this.#contactsApi
       .getAll()
-      .pipe(finalize(() => this.loading.set(false)))
-      .subscribe((data) => this.contacts.set(data));
+      .pipe(
+        finalize(() => this.loading.set(false)),
+        map((contacts) => contacts.sort((a, b) => a.name.localeCompare(b.name))),
+      )
+      .subscribe((contacts) => this.contacts.set(contacts));
   }
 
   openAdd(): void {

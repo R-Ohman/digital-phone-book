@@ -31,7 +31,9 @@ class ContactRepository:
         return contact
 
     async def get_by_name(self, name: str) -> List[Contact]:
-        result = await self.db.execute(select(Contact).where(Contact.name.ilike(name)))
+        result = await self.db.execute(
+            select(Contact).where(Contact.name.ilike(f"%{name}%"))
+        )
         return list(result.scalars().all())
 
     async def delete(self, contact: Contact) -> None:

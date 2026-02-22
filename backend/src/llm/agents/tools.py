@@ -109,17 +109,10 @@ def build_tools(
         )
 
     async def update_contact(
-        name: Optional[str] = None,
+        name: str,
         new_name: Optional[str] = None,
         new_phone_number: Optional[str] = None,
     ) -> str:
-        if not name:
-            return json.dumps(
-                {
-                    "success": False,
-                    "error": "Missing required field: 'name' (the current name of the contact to update)",
-                }
-            )
         async with session_factory() as session:
             svc = _make_service(session)
             contacts = await svc.get_by_name(name)
@@ -196,7 +189,11 @@ def build_tools(
         StructuredTool.from_function(
             coroutine=update_contact,
             name="update_contact",
-            description="Update an existing contact's name and/or phone number.",
+            description=(
+                "Update an existing contact's name or phone number. "
+                "Provide the current name of the contact plus the new values. "
+                "The contact is looked up internally — do NOT call get_contact first."
+            ),
             args_schema=UpdateContactInput,
         ),
     ]
