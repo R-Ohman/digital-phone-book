@@ -78,12 +78,15 @@ Once all services are healthy, open [http://localhost:8080](http://localhost:808
 
 ## Performance Testing
 
-Run API performance tests with k6 using the Docker Compose `perf` profile:
+Run performance tests with k6 using the Docker Compose `perf` profile:
 
 ```bash
 docker compose --profile perf run --rm k6
+docker compose --profile perf run --rm k6-llm
 ```
 
-The default script (`performance/k6/contacts-api.js`) exercises contact CRUD endpoints through Nginx (`/api/contacts`) and validates latency and error-rate thresholds.
+The `k6` runner executes `performance/k6/contacts-api.js` for contact CRUD endpoint load testing.
+
+The `k6-llm` runner executes `performance/k6/llm-stream.js` for LLM-driven CRUD load testing over the streaming endpoint (`/api/llm/prompt/stream`).
 
 For more details and customization options, see `performance/README.md`.

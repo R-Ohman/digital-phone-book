@@ -108,6 +108,46 @@ def build_tools(
             }
         )
 
+    async def delete_contact(name: str) -> str:
+        async with session_factory() as session:
+            svc = _make_service(session)
+            contacts = await svc.get_by_name(name)
+            if not contacts:
+                return json.dumps({"success": False, "name": name})
+            if len(contacts) > 1:
+                return json.dumps(
+                    {
+                        "success": False,
+                        "multiple_found": True,
+                        "contacts": [
+                            {
+                                "id": str(c.id),
+                                "name": c.name,
+                                "phone_number": c.phone_number,
+                            }
+                            for c in contacts
+                        ],
+                        "error": f"Multiple contacts found for '{name}'. Ask the user to clarify which one to delete.",
+                    }
+                )
+
+            contact = contacts[0]
+            deleted = await svc.delete(contact.id)
+
+        if not deleted:
+            return json.dumps(
+                {"success": False, "error": f"Contact '{name}' could not be deleted"}
+            )
+
+        return json.dumps(
+            {
+                "success": True,
+                "id": str(contact.id),
+                "name": contact.name,
+                "phone_number": contact.phone_number,
+            }
+        )
+
     async def update_contact(
         name: str,
         new_name: Optional[str] = None,
@@ -183,6 +223,15 @@ def build_tools(
                 "If found, shows the user a confirmation card — does NOT delete immediately. "
                 "If not found, returns not-found. "
                 "Use this as the sole tool for any delete request; do not call get_contact beforehand."
+            ),
+            args_schema=DeleteContactInput,
+        ),
+        StructuredTool.from_function(
+            coroutine=delete_contact,
+            name="delete_contact",
+            description=(
+                "Delete a contact immediately by name without confirmation cards. "
+                "Use this only when the user explicitly asks for immediate deletion (for example: 'delete now', 'without confirmation')."
             ),
             args_schema=DeleteContactInput,
         ),

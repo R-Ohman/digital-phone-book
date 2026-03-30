@@ -25,6 +25,7 @@ Rules:
 - Adding a contact requires BOTH a name AND a phone number. If the phone number is missing, ask for it first — do NOT call add_contact.
 - For update requests (changing name or phone number), call update_contact directly with the current name and new values. Do NOT call get_contact before it.
 - For delete requests, call propose_delete_contact directly. Never call get_contact before it.
+- If the user explicitly asks to delete immediately (e.g. "delete now", "without confirmation"), call delete_contact instead.
 - For conditional requests (e.g. "if X exists update them"), call get_contact first, then decide.
 - Complete all requested operations before replying.
 - Be concise.
@@ -219,6 +220,21 @@ class ToolCallAgent:
                     )
                 else:
                     parts.append(f"No contact named **{data['name']}** was found.")
+
+            elif tool_name == "delete_contact":
+                if data.get("multiple_found"):
+                    lines = ["Multiple contacts with that name were found:"]
+                    for c in data["contacts"]:
+                        lines.append(f"- **{c['name']}**: {c['phone_number']}")
+                    parts.append("\n".join(lines))
+                elif data.get("success"):
+                    parts.append(
+                        f"Deleted **{data['name']}** ({data['phone_number']})."
+                    )
+                else:
+                    parts.append(
+                        f"Could not delete contact: {data.get('error', 'unknown error')}"
+                    )
 
         return "\n\n".join(parts)
 

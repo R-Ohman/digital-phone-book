@@ -81,6 +81,19 @@ services:
     depends_on:
       - nginx
 
+  k6-llm:
+    image: grafana/k6:0.53.0
+    container_name: dpb_k6_llm
+    profiles:
+      - perf
+    environment:
+      BASE_URL: http://nginx
+    volumes:
+      - ./performance:/scripts
+    command: ["run", "/scripts/k6/llm-stream.js"]
+    depends_on:
+      - nginx
+
 volumes:
   postgres_data:
   ollama_data:
