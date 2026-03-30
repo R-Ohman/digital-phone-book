@@ -75,3 +75,15 @@ Once all services are healthy, open [http://localhost:8080](http://localhost:808
 
 - **Left panel** — browse, add, edit, and delete contacts via the table interface
 - **Right panel** — type a message to the AI assistant (e.g., _"Add John Doe with number 123-456-7890"_ or _"Find all contacts"_) and interact with the returned contact cards
+
+## Performance Testing
+
+Run API performance tests with k6 using the Docker Compose `perf` profile:
+
+```bash
+docker compose --profile perf run --rm k6
+```
+
+The default script (`performance/k6/contacts-api.js`) exercises contact CRUD endpoints through Nginx (`/api/contacts`) and validates latency and error-rate thresholds.
+
+For more details and customization options, see `performance/README.md`.

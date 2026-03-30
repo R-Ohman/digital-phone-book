@@ -68,6 +68,19 @@ services:
       timeout: 5s
       retries: 5
 
+  k6:
+    image: grafana/k6:0.53.0
+    container_name: dpb_k6
+    profiles:
+      - perf
+    environment:
+      BASE_URL: http://nginx
+    volumes:
+      - ./performance:/scripts
+    command: ["run", "/scripts/k6/contacts-api.js"]
+    depends_on:
+      - nginx
+
 volumes:
   postgres_data:
   ollama_data:
